@@ -1,0 +1,57 @@
+services:
+  attendance-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: attendance
+      POSTGRES_PASSWORD: attendance
+      POSTGRES_DB: attendance
+    ports:
+      - "5419:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance -d attendance"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - attendance-pg:/var/lib/postgresql/data
+
+  attendance-api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    environment:
+      ATTENDANCE_HTTP_PORT: "8019"
+      ATTENDANCE_STORE: jpa
+      ATTENDANCE_DEV_AUTH: ${ATTENDANCE_DEV_AUTH:-true}
+      ATTENDANCE_CORS_ORIGIN: ${ATTENDANCE_CORS_ORIGIN:-http://localhost:3019}
+      ATTENDANCE_SEED_DEMO: ${ATTENDANCE_SEED_DEMO:-true}
+      ATTENDANCE_DATASOURCE_URL: ${ATTENDANCE_DATASOURCE_URL:-jdbc:postgresql://attendance-db:5432/attendance}
+      ATTENDANCE_DB_USER: attendance
+      ATTENDANCE_DB_PASSWORD: attendance
+    ports:
+      - "8019:8019"
+    depends_on:
+      attendance-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8019/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  attendance-web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_ATTENDANCE_API_URL: ${NEXT_PUBLIC_ATTENDANCE_API_URL:-http://localhost:8019}
+    environment:
+      NEXT_PUBLIC_ATTENDANCE_API_URL: ${NEXT_PUBLIC_ATTENDANCE_API_URL:-http://localhost:8019}
+    ports:
+      - "3019:3019"
+    depends_on:
+      attendance-api:
+        condition: service_healthy
+
+volumes:
+  attendance-pg:

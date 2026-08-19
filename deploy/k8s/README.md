@@ -1,17 +1,3 @@
-# P09 attendance Kubernetes manifests
+# Kubernetes マニフェスト（P09 attendance）
 
-Spring Boot API + Next.js web。overlay smoke は `ATTENDANCE_DEV_AUTH` + `X-Dev-User-Sub`（シード従業員 `aoki.haru`）。単体 apply ではなく `pf-cloud-k8s` overlay `f-ops` から参照する。
-
-Ingress（`pf-cloud-k8s`）:
-
-| ホスト | Service | 用途 |
-| --- | --- | --- |
-| `attendance.localhost` | web:3019 | 打刻 UI |
-| `attendance-api.localhost` | api:8019 | REST |
-
-Postgres は platform の DB 名 `attendance`。
-
-```powershell
-cd ..\..\pf-cloud-k8s
-.\scripts\cluster-smoke-f-ops.ps1
-```
+Spring Boot API と Next.js です。このフォルダだけを apply しないでください。起動は [pf-cloud-k8s](https://github.com/maeplego/pf-cloud-k8s) の ops overlay からです。`attendance.localhost` と `attendance-api.localhost` です。Postgres は platform の DB 名 `attendance` です。

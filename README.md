@@ -60,10 +60,10 @@ DB なし。日境界と休憩控除は純関数、打刻 HTTP はメモリ店�
 - 月次カレンダー、修正申請、承認、有給、工数按分、締め、CSV、未打刻リマインドは無い
 - 代理打刻と監査ログは無い
 - 締め後 409 は未実装（締め自体が未実装）
-- overlay F / k8s は未着手
+- overlay F / k8s は `pf-cloud-k8s` overlay `f-ops`
 - 36 協定の法解釈はしない
 
 設計: `project/portfolio-plan/attendance/DESIGN.md`  
 人間向け書類: `project/portfolio-plan/attendance/docs/`
 
-AWS 3-tier（`../pf-cloud-aws`、P02 アイデア 16）はこの製品の Compose 単体デモとは別経路です。環境変数名は Compose と同じです。overlay F は未着手です。
+AWS 3-tier（`../pf-cloud-aws`、P02 アイデア 16）はこの製品の Compose 単体デモとは別経路です。環境変数名は Compose と同じです。overlay F は `../pf-cloud-k8s` の `cluster-smoke-f-ops.ps1`。

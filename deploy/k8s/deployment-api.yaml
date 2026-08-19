@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: attendance-api
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: attendance-api
+  template:
+    metadata:
+      labels:
+        app: attendance-api
+    spec:
+      containers:
+        - name: api
+          image: pf-attendance-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8019
+              name: http
+          env:
+            - name: ATTENDANCE_HTTP_PORT
+              value: "8019"
+            - name: ATTENDANCE_STORE
+              value: jpa
+            - name: ATTENDANCE_DEV_AUTH
+              value: "true"
+            - name: ATTENDANCE_CORS_ORIGIN
+              value: http://attendance.localhost
+            - name: ATTENDANCE_SEED_DEMO
+              value: "true"
+            - name: ATTENDANCE_DATASOURCE_URL
+              value: jdbc:postgresql://postgres.platform.svc.cluster.local:5432/attendance
+            - name: ATTENDANCE_DB_USER
+              value: attendance
+            - name: ATTENDANCE_DB_PASSWORD
+              value: dev-attendance
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres.platform.svc.cluster.local:5432/attendance
+            - name: SPRING_DATASOURCE_USERNAME
+              value: attendance
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: dev-attendance
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.platform.svc.cluster.local:4318
+            - name: OTEL_SERVICE_NAME
+              value: attendance-api
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8019
+            initialDelaySeconds: 40
+            periodSeconds: 8
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8019
+            initialDelaySeconds: 60
+            periodSeconds: 15

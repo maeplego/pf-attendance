@@ -65,3 +65,5 @@ DB なし。日境界と休憩控除は純関数、打刻 HTTP はメモリ店�
 
 設計: `project/portfolio-plan/attendance/DESIGN.md`  
 人間向け書類: `project/portfolio-plan/attendance/docs/`
+
+AWS 3-tier（`../pf-cloud-aws`、P02 アイデア 16）はこの製品の Compose 単体デモとは別経路です。環境変数名は Compose と同じです。overlay F は未着手です。

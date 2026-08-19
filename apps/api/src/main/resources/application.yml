@@ -1,0 +1,25 @@
+server:
+  port: ${ATTENDANCE_HTTP_PORT:8019}
+
+attendance:
+  store: ${ATTENDANCE_STORE:memory}
+  dev-auth: ${ATTENDANCE_DEV_AUTH:true}
+  cors-origin: ${ATTENDANCE_CORS_ORIGIN:http://localhost:3019}
+  seed-demo: ${ATTENDANCE_SEED_DEMO:true}
+
+spring:
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+  datasource:
+    url: ${ATTENDANCE_DATASOURCE_URL:jdbc:postgresql://localhost:5419/attendance}
+    username: ${ATTENDANCE_DB_USER:attendance}
+    password: ${ATTENDANCE_DB_PASSWORD:attendance}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true

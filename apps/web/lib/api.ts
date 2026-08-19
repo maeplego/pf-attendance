@@ -25,6 +25,20 @@ export type Me = {
   zone: string;
 };
 
+export type MonthDay = {
+  workDate: string;
+  workMinutes: number;
+  breakMinutes: number;
+  status: string;
+  punchCount: number;
+};
+
+export type MonthSummary = {
+  month: string;
+  zone: string;
+  days: MonthDay[];
+};
+
 function headers(sub: string): HeadersInit {
   return { "Content-Type": "application/json", "X-Dev-User-Sub": sub };
 }
@@ -46,6 +60,14 @@ export async function getMe(sub: string): Promise<Me> {
 
 export async function getDailySummary(sub: string): Promise<DailySummary> {
   const res = await fetch(`${API}/v1/me/daily-summary`, { headers: headers(sub) });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function getMonthSummary(sub: string, month: string): Promise<MonthSummary> {
+  const res = await fetch(`${API}/v1/me/month-summary?month=${encodeURIComponent(month)}`, {
+    headers: headers(sub),
+  });
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }

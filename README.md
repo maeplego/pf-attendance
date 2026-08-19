@@ -2,11 +2,11 @@
 
 P09 勤怠・工数の製品リポジトリです。**学習用であり、本番の勤怠 SaaS や給与計算、労基法準拠の置き換えではありません。** 簡易モデルです。金額は出しません。従業員は架空の「開発部 8 名」だけです。
 
-いまのスライスは **従業員マスタ、打刻イベント、日次労働時間（休憩控除）** です。月次カレンダー、申請承認、工数按分、月次締め、P01 接続は未着手です。夜勤は入れません（勤務日は打刻時刻の Asia/Tokyo 暦日）。
+いまのスライスは **従業員マスタ、打刻イベント、日次労働時間（休憩控除）、月次カレンダー** です。申請承認、工数按分、月次締め、P01 接続は未着手です。夜勤は入れません（勤務日は打刻時刻の Asia/Tokyo 暦日）。
 
 ```
 apps/api    Java 21 / Spring Boot。打刻は追記。サーバー時刻が正
-apps/web    Next.js。打刻ホームと本日サマリー
+apps/web    Next.js。打刻ホームと月次カレンダー
 deploy/     Postgres + API + Web
 ```
 
@@ -31,6 +31,7 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env up --build
 | URL | 用途 |
 | --- | --- |
 | http://localhost:3019 | 打刻ホーム |
+| http://localhost:3019/calendar | 月次カレンダー（Asia/Tokyo の暦日マス） |
 | http://localhost:8019/health | API liveness |
 | http://localhost:8019/ready | API readiness（Postgres ping） |
 
@@ -57,7 +58,7 @@ DB なし。日境界と休憩控除は純関数、打刻 HTTP はメモリ店�
 
 ## 既知の制限
 
-- 月次カレンダー、修正申請、承認、有給、工数按分、締め、CSV、未打刻リマインドは無い
+- 修正申請、承認、有給、工数按分、締め、CSV、未打刻リマインドは無い
 - 代理打刻と監査ログは無い
 - 締め後 409 は未実装（締め自体が未実装）
 - overlay F / k8s は `pf-cloud-k8s` overlay `f-ops`

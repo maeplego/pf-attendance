@@ -2,6 +2,7 @@ package com.pf.attendance.app;
 
 import com.pf.attendance.domain.DailyHoursCalculator;
 import com.pf.attendance.domain.DailySummary;
+import com.pf.attendance.domain.MonthSummary;
 import com.pf.attendance.domain.PunchConflictException;
 import com.pf.attendance.domain.PunchEvent;
 import com.pf.attendance.domain.PunchRules;
@@ -10,6 +11,8 @@ import com.pf.attendance.domain.WorkDates;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -53,5 +56,19 @@ public class AttendanceService {
     List<PunchEvent> events = punches.findByEmployeeAndWorkDate(employeeId, workDate);
     Instant asOf = WorkDates.of(Instant.now(clock)).equals(workDate) ? Instant.now(clock) : null;
     return DailyHoursCalculator.compute(workDate, events, asOf);
+  }
+
+  public MonthSummary monthSummary(String employeeId, YearMonth month) {
+    if (employees.findById(employeeId).isEmpty()) {
+      throw new UnknownEmployeeException(employeeId);
+    }
+    List<DailySummary> days = new ArrayList<>();
+    LocalDate cursor = month.atDay(1);
+    LocalDate last = month.atEndOfMonth();
+    while (!cursor.isAfter(last)) {
+      days.add(dailySummary(employeeId, cursor));
+      cursor = cursor.plusDays(1);
+    }
+    return new MonthSummary(month, List.copyOf(days));
   }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pf.attendance.domain.DailySummary;
+import com.pf.attendance.domain.MonthSummary;
 import com.pf.attendance.domain.PunchConflictException;
 import com.pf.attendance.domain.PunchEvent;
 import com.pf.attendance.domain.PunchType;
@@ -11,6 +12,7 @@ import com.pf.attendance.domain.WorkDates;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,6 +65,31 @@ class AttendanceServiceTest {
 
     assertThat(service.dailySummary(aoki.id(), LocalDate.of(2026, 8, 18)).punches()).hasSize(1);
     assertThat(service.dailySummary(aoki.id(), LocalDate.of(2026, 8, 19)).punches()).hasSize(1);
+  }
+
+  @Test
+  void monthSummaryListsEveryCivilDayAndKeepsPunchesOnTheirTokyoDate() {
+    clock.setInstant(Instant.parse("2026-08-18T14:59:00Z"));
+    service.punch(aoki.id(), PunchType.CLOCK_IN);
+    clock.setInstant(Instant.parse("2026-08-19T00:00:00Z"));
+    service.punch(aoki.id(), PunchType.CLOCK_IN);
+    clock.setInstant(Instant.parse("2026-08-19T09:00:00Z"));
+    service.punch(aoki.id(), PunchType.CLOCK_OUT);
+
+    MonthSummary month = service.monthSummary(aoki.id(), YearMonth.of(2026, 8));
+    assertThat(month.days()).hasSize(31);
+    DailySummary day18 =
+        month.days().stream().filter(d -> d.workDate().equals(LocalDate.of(2026, 8, 18))).findFirst().orElseThrow();
+    DailySummary day19 =
+        month.days().stream().filter(d -> d.workDate().equals(LocalDate.of(2026, 8, 19))).findFirst().orElseThrow();
+    DailySummary empty =
+        month.days().stream().filter(d -> d.workDate().equals(LocalDate.of(2026, 8, 1))).findFirst().orElseThrow();
+    assertThat(day18.punches()).hasSize(1);
+    assertThat(day19.punches()).hasSize(2);
+    assertThat(day19.workMinutes()).isEqualTo(540);
+    assertThat(empty.punches()).isEmpty();
+    assertThat(service.monthSummary(sato.id(), YearMonth.of(2026, 8)).days())
+        .allMatch(d -> d.punches().isEmpty());
   }
 
   @Test

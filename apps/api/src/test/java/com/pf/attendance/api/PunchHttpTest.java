@@ -116,6 +116,35 @@ class PunchHttpTest {
         .andExpect(jsonPath("$.error.code").value("validation_error"));
   }
 
+  @Test
+  void monthSummaryHas31DaysAndDoesNotLeakOtherEmployees() throws Exception {
+    MutableClock mutable = (MutableClock) clock;
+    mutable.setInstant(Instant.parse("2026-08-19T00:00:00Z"));
+    punch("clock_in");
+    mutable.setInstant(Instant.parse("2026-08-19T09:00:00Z"));
+    punch("clock_out");
+
+    mvc.perform(get("/v1/me/month-summary").param("month", "2026-08").header("X-Dev-User-Sub", "aoki.haru"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.month").value("2026-08"))
+        .andExpect(jsonPath("$.zone").value("Asia/Tokyo"))
+        .andExpect(jsonPath("$.days.length()").value(31))
+        .andExpect(jsonPath("$.days[18].workDate").value("2026-08-19"))
+        .andExpect(jsonPath("$.days[18].punchCount").value(2))
+        .andExpect(jsonPath("$.days[18].workMinutes").value(540));
+
+    mvc.perform(get("/v1/me/month-summary").param("month", "2026-08").header("X-Dev-User-Sub", "sato.mei"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.days[18].punchCount").value(0))
+        .andExpect(jsonPath("$.days[18].workMinutes").value(0));
+  }
+
+  @Test
+  void monthSummaryRejectsBadMonth() throws Exception {
+    mvc.perform(get("/v1/me/month-summary").param("month", "2026-13").header("X-Dev-User-Sub", "aoki.haru"))
+        .andExpect(status().isBadRequest());
+  }
+
   private void punch(String type) throws Exception {
     mvc.perform(
             post("/v1/punches")

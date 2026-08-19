@@ -17,6 +17,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <span className="muted" style={{ marginLeft: "0.75rem" }}>
             学習用勤怠（架空の開発部）
           </span>
+          <nav style={{ marginTop: "0.5rem" }}>
+            <a href="/">打刻</a>
+            {" · "}
+            <a href="/calendar">月次カレンダー</a>
+          </nav>
         </header>
         <main style={{ padding: "1rem 1.25rem 3rem", maxWidth: 880 }}>{children}</main>
       </body>

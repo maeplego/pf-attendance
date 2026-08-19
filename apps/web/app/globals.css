@@ -87,3 +87,58 @@ td {
   padding: 0.45rem 0.4rem;
   font-size: 0.92rem;
 }
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+button.ghost {
+  background: #fff;
+  color: var(--fg);
+  border-color: var(--line);
+  padding: 0.35rem 0.7rem;
+}
+
+.cal-weekdays,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem;
+}
+
+.cal-weekdays {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.cal-cell {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-height: 4.2rem;
+  padding: 0.35rem;
+}
+
+.cal-cell.has-punch {
+  border-color: var(--accent);
+  background: #eff6ff;
+}
+
+.cal-cell.empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+.cal-num {
+  font-weight: 600;
+}
+
+.cal-min {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

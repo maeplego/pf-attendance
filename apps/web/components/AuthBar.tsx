@@ -22,20 +22,20 @@ export function AuthBar() {
 
   if (!session?.oidc) {
     return (
-      <span className="muted" style={{ marginLeft: "0.75rem" }}>
+      <span className="auth-bar muted">
         dev-auth（従業員セレクタ）
       </span>
     );
   }
   if (!session.loggedIn) {
     return (
-      <span style={{ marginLeft: "0.75rem" }}>
+      <span className="auth-bar">
         <a href="/login">P01 ログイン</a>
       </span>
     );
   }
   return (
-    <span style={{ marginLeft: "0.75rem" }}>
+    <span className="auth-bar">
       <span className="muted">{session.displayName ?? session.sub}</span>
       {" · "}
       <a href="/logout">ログアウト</a>

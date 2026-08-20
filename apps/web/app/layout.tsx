@@ -13,21 +13,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja">
       <body>
-        <header style={{ padding: "1rem 1.25rem", borderBottom: "1px solid #e2e8f0", background: "#fff" }}>
-          <strong>pf-attendance</strong>
-          <span className="muted" style={{ marginLeft: "0.75rem" }}>
-            学習用勤怠（架空の開発部）
-          </span>
-          <AuthBar />
-          <nav style={{ marginTop: "0.5rem" }}>
-            <a href="/">打刻</a>
-            {" · "}
-            <a href="/calendar">月次カレンダー</a>
-            {" · "}
-            <a href="/workflow">申請・締め</a>
-          </nav>
-        </header>
-        <main style={{ padding: "1rem 1.25rem 3rem", maxWidth: 880 }}>{children}</main>
+        <div className="site-shell">
+          <header className="site-header">
+            <div className="site-brand">
+              <strong>pf-attendance</strong>
+              <span className="muted">学習用勤怠（架空の開発部）</span>
+            </div>
+            <nav className="site-nav">
+              <a href="/">打刻</a>
+              <a href="/calendar">月次カレンダー</a>
+              <a href="/workflow">申請・締め</a>
+            </nav>
+            <AuthBar />
+          </header>
+          <main className="site-main">{children}</main>
+        </div>
       </body>
     </html>
   );

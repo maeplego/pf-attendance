@@ -19,10 +19,13 @@ public class DevAuthFilter extends OncePerRequestFilter {
 
   private final AttendanceProperties properties;
   private final AttendanceService attendance;
+  private final OidcUserinfoClient oidc;
 
-  public DevAuthFilter(AttendanceProperties properties, AttendanceService attendance) {
+  public DevAuthFilter(
+      AttendanceProperties properties, AttendanceService attendance, OidcUserinfoClient oidc) {
     this.properties = properties;
     this.attendance = attendance;
+    this.oidc = oidc;
   }
 
   @Override
@@ -39,22 +42,48 @@ public class DevAuthFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
-    if (!properties.isDevAuth()) {
-      unauthorized(response, "dev auth is required until P01 is wired");
-      return;
+    String sub = null;
+    if (properties.isDevAuth()) {
+      sub = trimToNull(request.getHeader(HEADER));
     }
-    String sub = request.getHeader(HEADER);
-    if (sub == null || sub.isBlank()) {
-      unauthorized(response, "X-Dev-User-Sub is required");
+    if (sub == null) {
+      sub = bearerSub(request);
+    }
+    if (sub == null) {
+      unauthorized(response, properties.isDevAuth() ? "X-Dev-User-Sub is required" : "Bearer token required");
       return;
     }
     try {
-      Employee employee = attendance.requireBySub(sub.trim());
+      Employee employee = attendance.requireBySub(sub);
       request.setAttribute(EmployeePrincipal.ATTR, employee);
       filterChain.doFilter(request, response);
     } catch (UnknownEmployeeException ex) {
       unauthorized(response, "unknown employee");
     }
+  }
+
+  private String bearerSub(HttpServletRequest request) {
+    String issuer = properties.getOidcIssuer();
+    if (issuer == null || issuer.isBlank()) {
+      return null;
+    }
+    String authz = request.getHeader("Authorization");
+    if (authz == null || !authz.startsWith("Bearer ")) {
+      return null;
+    }
+    String token = authz.substring("Bearer ".length()).trim();
+    String base = properties.getOidcInternalBase();
+    if (base == null || base.isBlank()) {
+      base = issuer;
+    }
+    return oidc.resolveSub(base, token);
+  }
+
+  private static String trimToNull(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.trim();
   }
 
   private static void unauthorized(HttpServletResponse response, String message) throws IOException {

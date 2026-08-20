@@ -6,6 +6,9 @@ attendance:
   dev-auth: ${ATTENDANCE_DEV_AUTH:true}
   cors-origin: ${ATTENDANCE_CORS_ORIGIN:http://localhost:3019}
   seed-demo: ${ATTENDANCE_SEED_DEMO:true}
+  oidc-issuer: ${ATTENDANCE_OIDC_ISSUER:}
+  oidc-internal-base: ${ATTENDANCE_OIDC_INTERNAL_BASE:}
+  oidc-audience: ${ATTENDANCE_OIDC_AUDIENCE:}
 
 spring:
   jackson:

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthBar } from "@/components/AuthBar";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <span className="muted" style={{ marginLeft: "0.75rem" }}>
             学習用勤怠（架空の開発部）
           </span>
+          <AuthBar />
           <nav style={{ marginTop: "0.5rem" }}>
             <a href="/">打刻</a>
             {" · "}

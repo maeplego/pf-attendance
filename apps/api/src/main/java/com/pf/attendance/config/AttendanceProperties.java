@@ -8,6 +8,9 @@ public class AttendanceProperties {
   private boolean devAuth = true;
   private String corsOrigin = "http://localhost:3019";
   private boolean seedDemo = true;
+  private String oidcIssuer = "";
+  private String oidcInternalBase = "";
+  private String oidcAudience = "";
 
   public String getStore() {
     return store;
@@ -39,5 +42,29 @@ public class AttendanceProperties {
 
   public void setSeedDemo(boolean seedDemo) {
     this.seedDemo = seedDemo;
+  }
+
+  public String getOidcIssuer() {
+    return oidcIssuer;
+  }
+
+  public void setOidcIssuer(String oidcIssuer) {
+    this.oidcIssuer = oidcIssuer;
+  }
+
+  public String getOidcInternalBase() {
+    return oidcInternalBase;
+  }
+
+  public void setOidcInternalBase(String oidcInternalBase) {
+    this.oidcInternalBase = oidcInternalBase;
+  }
+
+  public String getOidcAudience() {
+    return oidcAudience;
+  }
+
+  public void setOidcAudience(String oidcAudience) {
+    this.oidcAudience = oidcAudience;
   }
 }

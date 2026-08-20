@@ -81,3 +81,86 @@ export async function postPunch(sub: string, type: string): Promise<Punch> {
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
+
+export async function postRequest(sub: string, type: string, workDate: string, reason: string) {
+  const res = await fetch(`${API}/v1/requests`, {
+    method: "POST",
+    headers: headers(sub),
+    body: JSON.stringify({ type, workDate, reason }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function listRequests(sub: string) {
+  const res = await fetch(`${API}/v1/requests`, { headers: headers(sub) });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ requests: WorkRequestRow[] }>;
+}
+
+export async function listApprovals(sub: string) {
+  const res = await fetch(`${API}/v1/approvals`, { headers: headers(sub) });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ requests: WorkRequestRow[] }>;
+}
+
+export async function decideRequest(sub: string, id: string, approve: boolean) {
+  const res = await fetch(`${API}/v1/requests/${id}/decision`, {
+    method: "POST",
+    headers: headers(sub),
+    body: JSON.stringify({ approve }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function postAllocation(sub: string, workDate: string, project: string, minutes: number) {
+  const res = await fetch(`${API}/v1/allocations`, {
+    method: "POST",
+    headers: headers(sub),
+    body: JSON.stringify({ workDate, project, minutes }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function listAllocations(sub: string, date: string) {
+  const res = await fetch(`${API}/v1/allocations?date=${encodeURIComponent(date)}`, { headers: headers(sub) });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ allocations: TimeAllocationRow[] }>;
+}
+
+export async function closeMonth(sub: string, month: string) {
+  const res = await fetch(`${API}/v1/months/${month}/close`, { method: "POST", headers: headers(sub) });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+export async function exportMonthCsv(sub: string, month: string): Promise<string> {
+  const res = await fetch(`${API}/v1/months/${month}/export.csv`, { headers: headers(sub) });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.text();
+}
+
+export async function unpunched(sub: string, date: string) {
+  const res = await fetch(`${API}/v1/reminders/unpunched?date=${encodeURIComponent(date)}`, {
+    headers: headers(sub),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ date: string; employees: { sub: string; displayName: string }[] }>;
+}
+
+export type WorkRequestRow = {
+  id: string;
+  type: string;
+  status: string;
+  workDate: string;
+  reason: string;
+};
+
+export type TimeAllocationRow = {
+  id: string;
+  workDate: string;
+  project: string;
+  minutes: number;
+};
+

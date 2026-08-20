@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 class AttendanceServiceTest {
   private MemoryEmployeeStore employees;
   private MemoryPunchStore punches;
+  private MemoryWorkflowStore workflow;
   private MutableClock clock;
   private AttendanceService service;
   private Employee aoki;
@@ -29,13 +30,14 @@ class AttendanceServiceTest {
   void setUp() {
     employees = new MemoryEmployeeStore();
     punches = new MemoryPunchStore();
+    workflow = new MemoryWorkflowStore();
     clock = new MutableClock(Instant.parse("2026-08-19T00:00:00Z"));
     for (Employee employee : DemoEmployees.roster()) {
       employees.save(employee);
     }
     aoki = employees.findBySub("aoki.haru").orElseThrow();
     sato = employees.findBySub("sato.mei").orElseThrow();
-    service = new AttendanceService(employees, punches, clock);
+    service = new AttendanceService(employees, punches, workflow, clock);
   }
 
   @Test
@@ -112,6 +114,31 @@ class AttendanceServiceTest {
     service.punch(aoki.id(), PunchType.CLOCK_IN);
     assertThatThrownBy(() -> service.punch(aoki.id(), PunchType.CLOCK_IN))
         .isInstanceOf(PunchConflictException.class);
+  }
+
+  @Test
+  void managerApprovesLeaveAndMemberCannotClose() {
+    WorkRequest req = service.submitRequest(aoki.id(), WorkRequest.LEAVE, LocalDate.of(2026, 8, 20), "有給");
+    assertThatThrownBy(() -> service.closeMonth(aoki, YearMonth.of(2026, 8))).isInstanceOf(ForbiddenException.class);
+    WorkRequest decided = service.decide(sato, req.id(), true);
+    assertThat(decided.status()).isEqualTo(WorkRequest.APPROVED);
+  }
+
+  @Test
+  void closedMonthRejectsPunchAndAllocationExceedsWork() {
+    service.punch(aoki.id(), PunchType.CLOCK_IN);
+    clock.setInstant(Instant.parse("2026-08-19T08:00:00Z"));
+    service.punch(aoki.id(), PunchType.CLOCK_OUT);
+    TimeAllocation row = service.allocate(aoki.id(), LocalDate.of(2026, 8, 19), "P09", 120);
+    assertThat(row.minutes()).isEqualTo(120);
+    assertThatThrownBy(() -> service.allocate(aoki.id(), LocalDate.of(2026, 8, 19), "P12", 500))
+        .isInstanceOf(IllegalArgumentException.class);
+    service.closeMonth(sato, YearMonth.of(2026, 8));
+    assertThatThrownBy(() -> service.punch(aoki.id(), PunchType.CLOCK_IN))
+        .isInstanceOf(com.pf.attendance.domain.PeriodClosedException.class);
+    String csv = service.monthCsv(sato, YearMonth.of(2026, 8));
+    assertThat(csv).contains("aoki.haru");
+    assertThat(service.unpunched(LocalDate.of(2026, 8, 19))).extracting(Employee::sub).contains("sato.mei");
   }
 
   private static final class MutableClock extends Clock {

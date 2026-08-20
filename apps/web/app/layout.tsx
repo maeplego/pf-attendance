@@ -21,6 +21,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/">打刻</a>
             {" · "}
             <a href="/calendar">月次カレンダー</a>
+            {" · "}
+            <a href="/workflow">申請・締め</a>
           </nav>
         </header>
         <main style={{ padding: "1rem 1.25rem 3rem", maxWidth: 880 }}>{children}</main>

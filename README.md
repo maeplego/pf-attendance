@@ -23,6 +23,7 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env up --build
 | --- | --- |
 | http://localhost:3019 | 打刻 |
 | http://localhost:3019/calendar | 月次カレンダー |
+| http://localhost:3019/workflow | 申請・承認・工数・締め |
 | http://localhost:8019/health | API |
 
 既定ユーザーは `aoki.haru`（青木 陽）。上長デモは `sato.mei`。他人の打刻は日次サマリーに出ません。
@@ -33,8 +34,10 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env up --build
 2. 労働分が休憩控除後の整数になることを見る（例: 09:00–18:00 で昼 1 時間なら 480 分）
 3. `sato.mei` に切り替えると、本日は空になる
 4. 不正な順序（休憩中の退勤、二重出勤）は 409
+5. 一般で休暇申請 → 上長で承認 → 上長で月次締め → 打刻が 409
+6. 労働分を超える工数按分は 400。CSV は上長のみ
 
-申請承認、工数按分、月次締め、代理打刻はありません。
+申請承認、工数按分、月次締め、未打刻一覧まであります。代理打刻はありません。給与計算はありません。
 
 ## テスト
 

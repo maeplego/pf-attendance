@@ -3,7 +3,9 @@ package com.pf.attendance.config;
 import com.pf.attendance.app.EmployeeStore;
 import com.pf.attendance.app.MemoryEmployeeStore;
 import com.pf.attendance.app.MemoryPunchStore;
+import com.pf.attendance.app.MemoryWorkflowStore;
 import com.pf.attendance.app.PunchStore;
+import com.pf.attendance.app.WorkflowStore;
 import java.time.Clock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,5 +30,11 @@ public class AttendanceConfig {
   @ConditionalOnProperty(name = "attendance.store", havingValue = "memory", matchIfMissing = true)
   PunchStore memoryPunches() {
     return new MemoryPunchStore();
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "attendance.store", havingValue = "memory", matchIfMissing = true)
+  WorkflowStore memoryWorkflow() {
+    return new MemoryWorkflowStore();
   }
 }

@@ -1,6 +1,8 @@
 package com.pf.attendance.api;
 
+import com.pf.attendance.app.ForbiddenException;
 import com.pf.attendance.app.UnknownEmployeeException;
+import com.pf.attendance.domain.PeriodClosedException;
 import com.pf.attendance.domain.PunchConflictException;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
@@ -15,6 +17,16 @@ public class ApiExceptionHandler {
   @ExceptionHandler(PunchConflictException.class)
   public ResponseEntity<Map<String, Object>> conflict(PunchConflictException ex) {
     return error(HttpStatus.CONFLICT, "conflict", ex.getMessage());
+  }
+
+  @ExceptionHandler(PeriodClosedException.class)
+  public ResponseEntity<Map<String, Object>> closed(PeriodClosedException ex) {
+    return error(HttpStatus.CONFLICT, "period_closed", ex.getMessage());
+  }
+
+  @ExceptionHandler(ForbiddenException.class)
+  public ResponseEntity<Map<String, Object>> forbidden(ForbiddenException ex) {
+    return error(HttpStatus.FORBIDDEN, "forbidden", ex.getMessage());
   }
 
   @ExceptionHandler(UnknownEmployeeException.class)

@@ -1,4 +1,4 @@
-# pf-attendance
+﻿# pf-attendance
 
 学習用の勤怠です。架空の「開発部 8 名」の打刻、休憩控除した日次労働時間、月次カレンダーまでです。金額は出しません。**本番の勤怠 SaaS や給与計算、労基法準拠の置き換えではありません。**
 
@@ -48,3 +48,13 @@ docker run --rm -v ${PWD}/apps/api:/src -w /src maven:3.9.9-eclipse-temurin-21 m
 ```
 
 設計の詳細は [portfolio-plan](https://github.com/maeplego/portfolio-plan) の `portfolio-plan/attendance/docs/` です。AWS 3-tier モジュールは [pf-cloud-aws](https://github.com/maeplego/pf-cloud-aws) で、ここでの Compose デモとは別経路です。
+
+## ライセンスと利用条件
+
+本リポジトリは **デモ・学習・社内評価用** です。現状品質に **保証はありません**。
+
+- 許可: クローン、ローカル実行、学習、非本番の評価
+- 別契約が必要: 本番運用、有償サービスへの組込み、再販・托管の提供
+
+詳細は [LICENSE](./LICENSE) と [licensing.md](https://github.com/maeplego/portfolio-plan/blob/master/portfolio-plan/licensing.md) を参照してください。
+

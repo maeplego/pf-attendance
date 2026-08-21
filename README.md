@@ -44,6 +44,12 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env up --build
 
 申請承認、工数按分、月次締め、未打刻一覧まであります。代理打刻はありません。給与計算はありません。
 
+## SES／PDF／期間設定
+
+- **SES（段階 A–C）:** 従業員の `engagement`（`employed` / `client_site`）と worksite 列。就業側は `GET /v1/months/{month}/handoff.csv`、雇用主側は `POST/GET .../handoffs` で CSV 受け取り。客先名簿は `GET /v1/worksite/visible-members`。
+- **PDF:** 上長が `GET /v1/months/{month}/timesheet.pdf`（任意 `employeeSub`）。
+- **期間設定:** `GET/PUT /v1/org/period-settings` で `periodAnchorDay` / `closeByDay`、CSV 既定プロファイル、所定出退勤・休憩。事後打刻は `POST /v1/punches` に `workDate`+`at`、または `POST /v1/me/days/{date}/apply-schedule`。
+
 ## テスト
 
 ホストに JDK 21 が無いときは Maven イメージで実行できます。

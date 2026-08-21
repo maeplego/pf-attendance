@@ -18,7 +18,7 @@ public class WebConfig implements WebMvcConfigurer {
         .addMapping("/**")
         .allowedOrigins(properties.getCorsOrigin())
         .allowedMethods("GET", "POST", "OPTIONS")
-        .allowedHeaders("Content-Type", "X-Dev-User-Sub")
+        .allowedHeaders("Content-Type", "Authorization", "X-Dev-User-Sub", "X-Dev-User-Org")
         .allowCredentials(false);
   }
 }

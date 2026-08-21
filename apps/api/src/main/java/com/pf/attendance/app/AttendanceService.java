@@ -7,6 +7,7 @@ import com.pf.attendance.app.handoff.TimesheetHandoffPort;
 import com.pf.attendance.app.worksite.CrossOrgAssignment;
 import com.pf.attendance.app.worksite.VisibleMember;
 import com.pf.attendance.app.worksite.WorksiteVisibilityStore;
+import com.pf.attendance.domain.AttendancePeriods;
 import com.pf.attendance.domain.DailyHoursCalculator;
 import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
@@ -32,6 +33,7 @@ public class AttendanceService {
   private final WorkflowStore workflow;
   private final TimesheetHandoffPort handoff;
   private final WorksiteVisibilityStore visibility;
+  private final OrgSettingsStore orgSettings;
   private final Clock clock;
 
   public AttendanceService(
@@ -40,12 +42,14 @@ public class AttendanceService {
       WorkflowStore workflow,
       TimesheetHandoffPort handoff,
       WorksiteVisibilityStore visibility,
+      OrgSettingsStore orgSettings,
       Clock clock) {
     this.employees = employees;
     this.punches = punches;
     this.workflow = workflow;
     this.handoff = handoff;
     this.visibility = visibility;
+    this.orgSettings = orgSettings;
     this.clock = clock;
   }
 
@@ -62,9 +66,7 @@ public class AttendanceService {
             .orElseThrow(() -> new UnknownEmployeeException(employeeId));
     Instant now = Instant.now(clock);
     LocalDate workDate = WorkDates.of(now);
-    if (workflow.isMonthClosed(employee.orgId(), YearMonth.from(workDate))) {
-      throw new PeriodClosedException("month is closed");
-    }
+    assertPeriodOpen(employee.orgId(), workDate);
     List<PunchEvent> existing = punches.findByEmployeeAndWorkDate(employee.id(), workDate);
     PunchRules.assertAllowed(existing, type);
     PunchEvent event =
@@ -83,12 +85,12 @@ public class AttendanceService {
   }
 
   public MonthSummary monthSummary(String employeeId, YearMonth month) {
-    if (employees.findById(employeeId).isEmpty()) {
-      throw new UnknownEmployeeException(employeeId);
-    }
+    Employee employee =
+        employees.findById(employeeId).orElseThrow(() -> new UnknownEmployeeException(employeeId));
+    int anchor = orgSettings.getOrDefault(employee.orgId()).periodAnchorDay();
     List<DailySummary> days = new ArrayList<>();
-    LocalDate cursor = month.atDay(1);
-    LocalDate last = month.atEndOfMonth();
+    LocalDate cursor = AttendancePeriods.startInclusive(month, anchor);
+    LocalDate last = AttendancePeriods.endInclusive(month, anchor);
     while (!cursor.isAfter(last)) {
       days.add(dailySummary(employeeId, cursor));
       cursor = cursor.plusDays(1);
@@ -105,9 +107,7 @@ public class AttendanceService {
     if (reason == null || reason.isBlank()) {
       throw new IllegalArgumentException("reason is required");
     }
-    if (workflow.isMonthClosed(employee.orgId(), YearMonth.from(workDate))) {
-      throw new PeriodClosedException("month is closed");
-    }
+    assertPeriodOpen(employee.orgId(), workDate);
     WorkRequest row =
         new WorkRequest(
             Ids.ulid(),
@@ -177,9 +177,7 @@ public class AttendanceService {
     if (minutes <= 0) {
       throw new IllegalArgumentException("minutes must be positive");
     }
-    if (workflow.isMonthClosed(employee.orgId(), YearMonth.from(workDate))) {
-      throw new PeriodClosedException("month is closed");
-    }
+    assertPeriodOpen(employee.orgId(), workDate);
     int used = workflow.listAllocations(employeeId, workDate).stream().mapToInt(TimeAllocation::minutes).sum();
     int work = dailySummary(employeeId, workDate).workMinutes();
     if (used + minutes > work) {
@@ -336,6 +334,25 @@ public class AttendanceService {
               a.worksiteName()));
     }
     return List.copyOf(out);
+  }
+
+  public OrgPeriodSettings getPeriodSettings(Employee actor) {
+    return orgSettings.getOrDefault(actor.orgId());
+  }
+
+  public OrgPeriodSettings putPeriodSettings(Employee actor, int periodAnchorDay) {
+    requireManager(actor);
+    OrgPeriodSettings next = new OrgPeriodSettings(actor.orgId(), periodAnchorDay);
+    orgSettings.save(next);
+    return next;
+  }
+
+  private void assertPeriodOpen(String orgId, LocalDate workDate) {
+    int anchor = orgSettings.getOrDefault(orgId).periodAnchorDay();
+    YearMonth period = AttendancePeriods.periodContaining(workDate, anchor);
+    if (workflow.isMonthClosed(orgId, period)) {
+      throw new PeriodClosedException("month is closed");
+    }
   }
 
   private static void requireManager(Employee actor) {

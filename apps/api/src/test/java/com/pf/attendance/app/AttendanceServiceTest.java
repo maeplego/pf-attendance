@@ -27,6 +27,7 @@ class AttendanceServiceTest {
   private MemoryWorkflowStore workflow;
   private MockTimesheetHandoffAdapter handoff;
   private MemoryWorksiteVisibilityStore visibility;
+  private MemoryOrgSettingsStore orgSettings;
   private MutableClock clock;
   private AttendanceService service;
   private Employee aoki;
@@ -40,6 +41,7 @@ class AttendanceServiceTest {
     workflow = new MemoryWorkflowStore();
     handoff = new MockTimesheetHandoffAdapter();
     visibility = new MemoryWorksiteVisibilityStore();
+    orgSettings = new MemoryOrgSettingsStore();
     clock = new MutableClock(Instant.parse("2026-08-19T00:00:00Z"));
     for (Employee employee : DemoEmployees.roster()) {
       employees.save(employee);
@@ -58,7 +60,8 @@ class AttendanceServiceTest {
     aoki = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "aoki.haru").orElseThrow();
     sato = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "sato.mei").orElseThrow();
     ise = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "ise.yuto").orElseThrow();
-    service = new AttendanceService(employees, punches, workflow, handoff, visibility, clock);
+    service =
+        new AttendanceService(employees, punches, workflow, handoff, visibility, orgSettings, clock);
   }
 
   @Test
@@ -214,6 +217,23 @@ class AttendanceServiceTest {
 
     String employerCsv = service.monthCsv(sato, YearMonth.of(2026, 8));
     assertThat(employerCsv).contains("ise.yuto");
+  }
+
+  @Test
+  void periodAnchorDayChangesSummaryRangeAndCloseBoundary() {
+    service.putPeriodSettings(sato, 21);
+    MonthSummary summary = service.monthSummary(aoki.id(), YearMonth.of(2026, 8));
+    assertThat(summary.days().getFirst().workDate()).isEqualTo(LocalDate.of(2026, 7, 21));
+    assertThat(summary.days().getLast().workDate()).isEqualTo(LocalDate.of(2026, 8, 20));
+
+    service.closeMonth(sato, YearMonth.of(2026, 8));
+    // 2026-08-19 is still in closed period 2026-08 when anchor=21
+    assertThatThrownBy(() -> service.punch(aoki.id(), PunchType.CLOCK_IN))
+        .isInstanceOf(com.pf.attendance.domain.PeriodClosedException.class);
+
+    clock.setInstant(Instant.parse("2026-08-21T01:00:00Z")); // JST 08-21 10:00 → period 2026-09
+    PunchEvent ok = service.punch(aoki.id(), PunchType.CLOCK_IN);
+    assertThat(ok.workDate()).isEqualTo(LocalDate.of(2026, 8, 21));
   }
 
   private static final class MutableClock extends Clock {

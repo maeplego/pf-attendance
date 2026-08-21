@@ -7,6 +7,7 @@ import {
   downloadTextFile,
   exportHandoffCsv,
   exportMonthCsv,
+  getPeriodSettings,
   ingestHandoffCsv,
   listAllocations,
   listApprovals,
@@ -15,6 +16,7 @@ import {
   listVisibleMembers,
   postAllocation,
   postRequest,
+  putPeriodSettings,
   unpunched,
   type TimeAllocationRow,
   type WorkRequestRow,
@@ -39,6 +41,7 @@ export function WorkflowPanel() {
   const [visible, setVisible] = useState<
     { sub: string; displayName: string; kind: string; worksiteName: string; payrollOwnedHere: boolean }[]
   >([]);
+  const [anchorDay, setAnchorDay] = useState(1);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
@@ -61,14 +64,16 @@ export function WorkflowPanel() {
             }[],
           }) as const,
       ),
+      getPeriodSettings(sub).catch(() => ({ periodAnchorDay: 1 })),
     ])
-      .then(([r, a, inboxBody, miss, hand, vis]) => {
+      .then(([r, a, inboxBody, miss, hand, vis, period]) => {
         setMine(r.requests);
         setAllocs(a.allocations);
         setInbox(inboxBody.requests);
         setMissing(miss.employees ?? []);
         setHandoffs(hand.receipts ?? []);
         setVisible(vis.members ?? []);
+        setAnchorDay(period.periodAnchorDay ?? 1);
         setErr("");
       })
       .catch((e) => setErr(String(e)));
@@ -186,6 +191,32 @@ export function WorkflowPanel() {
           </li>
         ))}
       </ul>
+
+      <h2>集計期間（periodAnchorDay）</h2>
+      <p className="muted">1=暦月。21=前月21日〜当月20日をラベル月に割り当て（上長のみ変更可）。</p>
+      <div className="punch-row">
+        <input
+          type="number"
+          min={1}
+          max={28}
+          value={anchorDay}
+          onChange={(e) => setAnchorDay(Number(e.target.value))}
+        />
+        <button
+          type="button"
+          onClick={() =>
+            putPeriodSettings(sub, anchorDay)
+              .then((s) => {
+                setAnchorDay(s.periodAnchorDay);
+                setInfo(`periodAnchorDay=${s.periodAnchorDay} を保存しました。`);
+                setErr("");
+              })
+              .catch((e) => setErr(String(e)))
+          }
+        >
+          保存（上長）
+        </button>
+      </div>
 
       <h2>現場メンバー（自社 + 他社ゲスト読取）</h2>
       <p className="muted">

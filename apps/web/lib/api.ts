@@ -200,6 +200,21 @@ export async function listVisibleMembers(sub: string) {
   }>;
 }
 
+export async function getPeriodSettings(sub: string) {
+  const res = await fetch(`${API}/v1/org/period-settings`, req(sub));
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ orgId: string; periodAnchorDay: number }>;
+}
+
+export async function putPeriodSettings(sub: string, periodAnchorDay: number) {
+  const res = await fetch(
+    `${API}/v1/org/period-settings`,
+    req(sub, { method: "PUT", body: JSON.stringify({ periodAnchorDay }) }),
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ orgId: string; periodAnchorDay: number }>;
+}
+
 export async function unpunched(sub: string, date: string) {
   const res = await fetch(`${API}/v1/reminders/unpunched?date=${encodeURIComponent(date)}`, req(sub));
   if (!res.ok) throw new Error(await readError(res));

@@ -7,6 +7,8 @@ export const DEMO_PEOPLE = [
   { sub: "okada.ritsu", label: "岡田 律（一般）", role: "member" },
   { sub: "nakamura.nagi", label: "中村 凪（一般）", role: "member" },
   { sub: "takahashi.saku", label: "高橋 朔（一般）", role: "member" },
+  { sub: "ise.yuto", label: "伊勢 悠人（客先常駐・架空商事）", role: "member" },
+  { sub: "shima.rena", label: "島 玲奈（客先常駐・架空銀行）", role: "member" },
 ] as const;
 
 /** Asia/Tokyo calendar date YYYY-MM-DD for demo defaults. */

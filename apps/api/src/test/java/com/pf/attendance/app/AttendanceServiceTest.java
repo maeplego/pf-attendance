@@ -138,6 +138,14 @@ class AttendanceServiceTest {
         .isInstanceOf(com.pf.attendance.domain.PeriodClosedException.class);
     String csv = service.monthCsv(sato, YearMonth.of(2026, 8));
     assertThat(csv).contains("aoki.haru");
+    assertThat(csv.split("\n", 2)[0])
+        .isEqualTo(
+            "sub,displayName,workDate,workMinutes,breakMinutes,status,engagement,worksiteCode,worksiteName");
+    assertThat(csv).contains("employed");
+    assertThat(csv).contains("ise.yuto");
+    assertThat(csv).contains("client_site");
+    assertThat(csv).contains("WS-CLIENT-A");
+    assertThat(csv).contains("架空商事 本社開発");
     assertThat(service.unpunched(sato, LocalDate.of(2026, 8, 19))).extracting(Employee::sub).contains("sato.mei");
   }
 

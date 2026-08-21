@@ -105,7 +105,15 @@ public class WorkflowController {
         date,
         "employees",
         attendance.unpunched(actor, LocalDate.parse(date)).stream()
-            .map(e -> Map.of("sub", e.sub(), "displayName", e.displayName(), "role", e.role()))
+            .map(
+                e ->
+                    Map.of(
+                        "sub", e.sub(),
+                        "displayName", e.displayName(),
+                        "role", e.role(),
+                        "engagement", e.engagement(),
+                        "worksiteCode", e.worksiteCode(),
+                        "worksiteName", e.worksiteName()))
             .toList());
   }
 

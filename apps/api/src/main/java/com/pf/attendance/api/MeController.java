@@ -18,6 +18,9 @@ public class MeController {
         "sub", employee.sub(),
         "displayName", employee.displayName(),
         "role", employee.role(),
+        "engagement", employee.engagement(),
+        "worksiteCode", employee.worksiteCode(),
+        "worksiteName", employee.worksiteName(),
         "zone", WorkDates.ZONE.getId());
   }
 }

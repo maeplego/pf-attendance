@@ -30,7 +30,14 @@ public class JpaEmployeeStore implements EmployeeStore {
   public void save(Employee employee) {
     repo.save(
         new EmployeeEntity(
-            employee.id(), employee.orgId(), employee.sub(), employee.displayName(), employee.role()));
+            employee.id(),
+            employee.orgId(),
+            employee.sub(),
+            employee.displayName(),
+            employee.role(),
+            employee.engagement(),
+            employee.worksiteCode(),
+            employee.worksiteName()));
   }
 
   @Override
@@ -45,6 +52,13 @@ public class JpaEmployeeStore implements EmployeeStore {
 
   private Employee toDomain(EmployeeEntity entity) {
     return new Employee(
-        entity.getId(), entity.getOrgId(), entity.getSub(), entity.getDisplayName(), entity.getRole());
+        entity.getId(),
+        entity.getOrgId(),
+        entity.getSub(),
+        entity.getDisplayName(),
+        entity.getRole(),
+        entity.getEngagement(),
+        entity.getWorksiteCode(),
+        entity.getWorksiteName());
   }
 }

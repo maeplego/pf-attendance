@@ -22,6 +22,9 @@ export type Me = {
   sub: string;
   displayName: string;
   role: string;
+  engagement?: string;
+  worksiteCode?: string;
+  worksiteName?: string;
   zone: string;
 };
 

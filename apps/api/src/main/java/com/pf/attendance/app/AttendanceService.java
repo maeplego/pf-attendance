@@ -193,7 +193,9 @@ public class AttendanceService {
   public String monthCsv(Employee actor, YearMonth month) {
     requireManager(actor);
     StringJoiner lines = new StringJoiner("\n");
-    lines.add("sub,displayName,workDate,workMinutes,breakMinutes,status");
+    // minutes-v1 prefix unchanged for P16; Stage A SES columns appended.
+    lines.add(
+        "sub,displayName,workDate,workMinutes,breakMinutes,status,engagement,worksiteCode,worksiteName");
     for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
       MonthSummary summary = monthSummary(employee.id(), month);
       for (DailySummary day : summary.days()) {
@@ -205,7 +207,10 @@ public class AttendanceService {
                 day.workDate().toString(),
                 Integer.toString(day.workMinutes()),
                 Integer.toString(day.breakMinutes()),
-                day.status().name().toLowerCase()));
+                day.status().name().toLowerCase(),
+                employee.engagement(),
+                csv(employee.worksiteCode()),
+                csv(employee.worksiteName())));
       }
     }
     return lines.toString() + "\n";

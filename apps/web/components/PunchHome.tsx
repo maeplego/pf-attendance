@@ -49,7 +49,11 @@ export function PunchHome() {
       </label>
       {me ? (
         <p className="muted">
-          {me.displayName} · {me.role} · ゾーン {me.zone}
+          {me.displayName} · {me.role}
+          {me.engagement === "client_site" && me.worksiteName
+            ? ` · 客先 ${me.worksiteName}`
+            : ""}{" "}
+          · ゾーン {me.zone}
         </p>
       ) : null}
       {err ? <p className="error">{err}</p> : null}

@@ -86,15 +86,38 @@ public class WorkflowController {
   }
 
   @GetMapping("/v1/months/{month}/export.csv")
-  public ResponseEntity<String> export(HttpServletRequest request, @PathVariable String month) {
+  public ResponseEntity<String> export(
+      HttpServletRequest request,
+      @PathVariable String month,
+      @RequestParam(required = false) String profile,
+      @RequestParam(required = false) Boolean header,
+      @RequestParam(required = false) String columns) {
     Employee employee = EmployeePrincipal.require(request);
-    String csv = attendance.monthCsv(employee, YearMonth.parse(month));
+    List<String> cols =
+        columns == null || columns.isBlank()
+            ? List.of()
+            : List.of(columns.split(","));
+    String csv =
+        attendance.monthCsv(employee, YearMonth.parse(month), profile, header, cols);
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"attendance-" + month + ".csv\"")
         // P16 payroll ingest contract: minutes only, no yen/tax columns.
         .header("X-Attendance-Export-Contract", "minutes-v1")
         .contentType(MediaType.parseMediaType("text/csv"))
         .body(csv);
+  }
+
+  @GetMapping("/v1/months/{month}/timesheet.pdf")
+  public ResponseEntity<byte[]> timesheetPdf(
+      HttpServletRequest request,
+      @PathVariable String month,
+      @RequestParam(required = false) String employeeSub) {
+    Employee actor = EmployeePrincipal.require(request);
+    byte[] pdf = attendance.monthPdf(actor, YearMonth.parse(month), employeeSub);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"timesheet-" + month + ".pdf\"")
+        .contentType(MediaType.APPLICATION_PDF)
+        .body(pdf);
   }
 
   @GetMapping("/v1/reminders/unpunched")

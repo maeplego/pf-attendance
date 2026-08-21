@@ -154,10 +154,62 @@ export async function closeMonth(sub: string, month: string) {
   if (!res.ok) throw new Error(await readError(res));
 }
 
-export async function exportMonthCsv(sub: string, month: string): Promise<string> {
-  const res = await fetch(`${API}/v1/months/${month}/export.csv`, req(sub));
+export async function exportMonthCsv(
+  sub: string,
+  month: string,
+  opts?: { profile?: string; header?: boolean; columns?: string },
+): Promise<string> {
+  const q = new URLSearchParams();
+  if (opts?.profile) q.set("profile", opts.profile);
+  if (opts?.header !== undefined) q.set("header", String(opts.header));
+  if (opts?.columns) q.set("columns", opts.columns);
+  const qs = q.toString();
+  const res = await fetch(`${API}/v1/months/${month}/export.csv${qs ? `?${qs}` : ""}`, req(sub));
   if (!res.ok) throw new Error(await readError(res));
   return res.text();
+}
+
+export async function exportTimesheetPdf(sub: string, month: string, employeeSub?: string): Promise<Blob> {
+  const q = employeeSub ? `?employeeSub=${encodeURIComponent(employeeSub)}` : "";
+  const res = await fetch(`${API}/v1/months/${month}/timesheet.pdf${q}`, req(sub));
+  if (!res.ok) throw new Error(await readError(res));
+  return res.blob();
+}
+
+export async function putProvisionalDay(
+  sub: string,
+  body: { workDate: string; workMinutes: number; breakMinutes?: number; note?: string },
+) {
+  const res = await fetch(
+    `${API}/v1/me/provisional-days`,
+    req(sub, { method: "PUT", body: JSON.stringify(body) }),
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function putPeriodSettings(
+  sub: string,
+  body: {
+    periodAnchorDay?: number;
+    closeByDay?: number;
+    csvProfileId?: string;
+    csvIncludeHeader?: boolean;
+    csvColumns?: string[];
+  },
+) {
+  const res = await fetch(
+    `${API}/v1/org/period-settings`,
+    req(sub, { method: "PUT", body: JSON.stringify(body) }),
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{
+    orgId: string;
+    periodAnchorDay: number;
+    closeByDay: number;
+    csvProfileId: string;
+    csvIncludeHeader: boolean;
+  }>;
 }
 
 export async function exportHandoffCsv(sub: string, month: string): Promise<string> {
@@ -203,16 +255,13 @@ export async function listVisibleMembers(sub: string) {
 export async function getPeriodSettings(sub: string) {
   const res = await fetch(`${API}/v1/org/period-settings`, req(sub));
   if (!res.ok) throw new Error(await readError(res));
-  return res.json() as Promise<{ orgId: string; periodAnchorDay: number }>;
-}
-
-export async function putPeriodSettings(sub: string, periodAnchorDay: number) {
-  const res = await fetch(
-    `${API}/v1/org/period-settings`,
-    req(sub, { method: "PUT", body: JSON.stringify({ periodAnchorDay }) }),
-  );
-  if (!res.ok) throw new Error(await readError(res));
-  return res.json() as Promise<{ orgId: string; periodAnchorDay: number }>;
+  return res.json() as Promise<{
+    orgId: string;
+    periodAnchorDay: number;
+    closeByDay: number;
+    csvProfileId: string;
+    csvIncludeHeader: boolean;
+  }>;
 }
 
 export async function unpunched(sub: string, date: string) {

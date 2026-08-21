@@ -7,6 +7,7 @@ import {
   downloadTextFile,
   exportHandoffCsv,
   exportMonthCsv,
+  exportTimesheetPdf,
   getPeriodSettings,
   ingestHandoffCsv,
   listAllocations,
@@ -17,6 +18,7 @@ import {
   postAllocation,
   postRequest,
   putPeriodSettings,
+  putProvisionalDay,
   unpunched,
   type TimeAllocationRow,
   type WorkRequestRow,
@@ -42,6 +44,11 @@ export function WorkflowPanel() {
     { sub: string; displayName: string; kind: string; worksiteName: string; payrollOwnedHere: boolean }[]
   >([]);
   const [anchorDay, setAnchorDay] = useState(1);
+  const [closeByDay, setCloseByDay] = useState(0);
+  const [csvProfile, setCsvProfile] = useState("minutes-v1");
+  const [csvHeader, setCsvHeader] = useState(true);
+  const [provDate, setProvDate] = useState(today);
+  const [provMinutes, setProvMinutes] = useState(480);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
@@ -74,6 +81,9 @@ export function WorkflowPanel() {
         setHandoffs(hand.receipts ?? []);
         setVisible(vis.members ?? []);
         setAnchorDay(period.periodAnchorDay ?? 1);
+        setCloseByDay(period.closeByDay ?? 0);
+        setCsvProfile(period.csvProfileId ?? "minutes-v1");
+        setCsvHeader(period.csvIncludeHeader ?? true);
         setErr("");
       })
       .catch((e) => setErr(String(e)));
@@ -192,29 +202,89 @@ export function WorkflowPanel() {
         ))}
       </ul>
 
-      <h2>集計期間（periodAnchorDay）</h2>
-      <p className="muted">1=暦月。21=前月21日〜当月20日をラベル月に割り当て（上長のみ変更可）。</p>
+      <h2>集計期間・締め日・CSV 形式</h2>
+      <p className="muted">
+        periodAnchorDay: 1=暦月 / 21=21日起算。closeByDay: 25 なら 26 日以降は見込み入力可。CSV はプリセットまたは列カスタム（ERP 認証形式ではない）。
+      </p>
       <div className="punch-row">
-        <input
-          type="number"
-          min={1}
-          max={28}
-          value={anchorDay}
-          onChange={(e) => setAnchorDay(Number(e.target.value))}
-        />
+        <label>
+          anchor
+          <input
+            type="number"
+            min={1}
+            max={28}
+            value={anchorDay}
+            onChange={(e) => setAnchorDay(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          closeByDay
+          <input
+            type="number"
+            min={0}
+            max={28}
+            value={closeByDay}
+            onChange={(e) => setCloseByDay(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          CSV profile
+          <select value={csvProfile} onChange={(e) => setCsvProfile(e.target.value)}>
+            <option value="minutes-v1">minutes-v1</option>
+            <option value="erp-generic-ja">erp-generic-ja</option>
+            <option value="custom">custom</option>
+          </select>
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={csvHeader}
+            onChange={(e) => setCsvHeader(e.target.checked)}
+          />{" "}
+          見出し行
+        </label>
         <button
           type="button"
           onClick={() =>
-            putPeriodSettings(sub, anchorDay)
+            putPeriodSettings(sub, {
+              periodAnchorDay: anchorDay,
+              closeByDay,
+              csvProfileId: csvProfile,
+              csvIncludeHeader: csvHeader,
+            })
               .then((s) => {
                 setAnchorDay(s.periodAnchorDay);
-                setInfo(`periodAnchorDay=${s.periodAnchorDay} を保存しました。`);
+                setCloseByDay(s.closeByDay);
+                setCsvProfile(s.csvProfileId);
+                setCsvHeader(s.csvIncludeHeader);
+                setInfo(`設定を保存しました（closeByDay=${s.closeByDay}）。`);
                 setErr("");
               })
               .catch((e) => setErr(String(e)))
           }
         >
           保存（上長）
+        </button>
+      </div>
+      <div className="punch-row">
+        <input type="date" value={provDate} onChange={(e) => setProvDate(e.target.value)} />
+        <input
+          type="number"
+          value={provMinutes}
+          onChange={(e) => setProvMinutes(Number(e.target.value))}
+        />
+        <button
+          type="button"
+          onClick={() =>
+            putProvisionalDay(sub, { workDate: provDate, workMinutes: provMinutes, breakMinutes: 60 })
+              .then(() => {
+                setInfo(`${provDate} の見込み ${provMinutes} 分を保存しました。`);
+                setErr("");
+              })
+              .catch((e) => setErr(String(e)))
+          }
+        >
+          見込み入力
         </button>
       </div>
 
@@ -251,16 +321,35 @@ export function WorkflowPanel() {
         <button
           type="button"
           onClick={() =>
-            exportMonthCsv(sub, month)
+            exportMonthCsv(sub, month, { profile: csvProfile, header: csvHeader })
               .then((text) => {
                 downloadTextFile(`attendance-${month}.csv`, text);
-                setInfo(`${month} の CSV をダウンロードしました。`);
+                setInfo(`${month} の CSV（${csvProfile}）をダウンロードしました。`);
                 setErr("");
               })
               .catch((e) => setErr(String(e)))
           }
         >
           CSV ダウンロード
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            exportTimesheetPdf(sub, month)
+              .then((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `timesheet-${month}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+                setInfo(`${month} の PDF（印刷・サイン用デモ）をダウンロードしました。`);
+                setErr("");
+              })
+              .catch((e) => setErr(String(e)))
+          }
+        >
+          PDF ダウンロード
         </button>
         <button
           type="button"

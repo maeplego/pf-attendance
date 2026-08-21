@@ -38,6 +38,7 @@ public class MonthSummaryController {
       row.put("breakMinutes", day.breakMinutes());
       row.put("status", day.status().name().toLowerCase(Locale.ROOT));
       row.put("punchCount", day.punches().size());
+      row.put("provisional", day.provisional());
       days.add(row);
     }
     return Map.of(

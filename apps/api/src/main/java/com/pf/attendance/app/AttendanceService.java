@@ -1,5 +1,10 @@
 package com.pf.attendance.app;
 
+import com.pf.attendance.app.export.CsvColumn;
+import com.pf.attendance.app.export.CsvExportProfile;
+import com.pf.attendance.app.export.CsvExportProfiles;
+import com.pf.attendance.app.export.CsvExporter;
+import com.pf.attendance.app.export.PdfTimesheetRenderer;
 import com.pf.attendance.app.handoff.HandoffCsv;
 import com.pf.attendance.app.handoff.HandoffDayLine;
 import com.pf.attendance.app.handoff.HandoffReceipt;
@@ -14,6 +19,7 @@ import com.pf.attendance.domain.MonthSummary;
 import com.pf.attendance.domain.PeriodClosedException;
 import com.pf.attendance.domain.PunchEvent;
 import com.pf.attendance.domain.PunchRules;
+import com.pf.attendance.domain.PunchState;
 import com.pf.attendance.domain.PunchType;
 import com.pf.attendance.domain.WorkDates;
 import java.time.Clock;
@@ -23,7 +29,6 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.StringJoiner;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -34,6 +39,7 @@ public class AttendanceService {
   private final TimesheetHandoffPort handoff;
   private final WorksiteVisibilityStore visibility;
   private final OrgSettingsStore orgSettings;
+  private final ProvisionalDayStore provisionals;
   private final Clock clock;
 
   public AttendanceService(
@@ -43,6 +49,7 @@ public class AttendanceService {
       TimesheetHandoffPort handoff,
       WorksiteVisibilityStore visibility,
       OrgSettingsStore orgSettings,
+      ProvisionalDayStore provisionals,
       Clock clock) {
     this.employees = employees;
     this.punches = punches;
@@ -50,6 +57,7 @@ public class AttendanceService {
     this.handoff = handoff;
     this.visibility = visibility;
     this.orgSettings = orgSettings;
+    this.provisionals = provisionals;
     this.clock = clock;
   }
 
@@ -81,7 +89,22 @@ public class AttendanceService {
     }
     List<PunchEvent> events = punches.findByEmployeeAndWorkDate(employeeId, workDate);
     Instant asOf = WorkDates.of(Instant.now(clock)).equals(workDate) ? Instant.now(clock) : null;
-    return DailyHoursCalculator.compute(workDate, events, asOf);
+    DailySummary computed = DailyHoursCalculator.compute(workDate, events, asOf);
+    if (!events.isEmpty()) {
+      return computed;
+    }
+    Optional<ProvisionalDay> provisional = provisionals.find(employeeId, workDate);
+    if (provisional.isPresent()) {
+      ProvisionalDay p = provisional.get();
+      return new DailySummary(
+          workDate,
+          p.workMinutes(),
+          p.breakMinutes(),
+          PunchState.PROVISIONAL,
+          List.of(),
+          true);
+    }
+    return computed;
   }
 
   public MonthSummary monthSummary(String employeeId, YearMonth month) {
@@ -205,29 +228,77 @@ public class AttendanceService {
   }
 
   public String monthCsv(Employee actor, YearMonth month) {
+    return monthCsv(actor, month, null, null, null);
+  }
+
+  public String monthCsv(
+      Employee actor,
+      YearMonth month,
+      String profileId,
+      Boolean includeHeader,
+      List<String> columnsOverride) {
     requireManager(actor);
-    StringJoiner lines = new StringJoiner("\n");
-    // minutes-v1 prefix unchanged for P16; Stage A SES columns appended.
-    lines.add(
-        "sub,displayName,workDate,workMinutes,breakMinutes,status,engagement,worksiteCode,worksiteName");
+    OrgPeriodSettings settings = orgSettings.getOrDefault(actor.orgId());
+    String profile =
+        profileId == null || profileId.isBlank() ? settings.csvProfileId() : profileId.trim();
+    boolean header = includeHeader == null ? settings.csvIncludeHeader() : includeHeader;
+    List<CsvColumn> cols =
+        columnsOverride == null || columnsOverride.isEmpty()
+            ? CsvColumn.parseList(settings.csvColumns())
+            : CsvColumn.parseList(columnsOverride);
+    CsvExportProfile resolved = CsvExportProfiles.resolve(profile, header, cols);
+    List<CsvExporter.EmployeeDayRow> rows = new ArrayList<>();
     for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
-      MonthSummary summary = monthSummary(employee.id(), month);
-      for (DailySummary day : summary.days()) {
-        lines.add(
-            String.join(
-                ",",
-                employee.sub(),
-                csv(employee.displayName()),
-                day.workDate().toString(),
-                Integer.toString(day.workMinutes()),
-                Integer.toString(day.breakMinutes()),
-                day.status().name().toLowerCase(),
-                employee.engagement(),
-                csv(employee.worksiteCode()),
-                csv(employee.worksiteName())));
+      rows.addAll(CsvExporter.flatten(employee, monthSummary(employee.id(), month).days()));
+    }
+    return CsvExporter.render(resolved, rows);
+  }
+
+  public byte[] monthPdf(Employee actor, YearMonth month, String employeeSub) {
+    requireManager(actor);
+    String disclaimer =
+        "Demo timesheet for print/sign workflows. Not a legal attendance record. No yen/tax.";
+    List<PdfTimesheetRenderer.EmployeeSheet> sheets = new ArrayList<>();
+    if (employeeSub != null && !employeeSub.isBlank()) {
+      Employee target =
+          employees
+              .findByOrgIdAndSub(actor.orgId(), employeeSub.trim())
+              .orElseThrow(() -> new UnknownEmployeeException(employeeSub));
+      sheets.add(new PdfTimesheetRenderer.EmployeeSheet(target, monthSummary(target.id(), month)));
+    } else {
+      for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
+        sheets.add(new PdfTimesheetRenderer.EmployeeSheet(employee, monthSummary(employee.id(), month)));
       }
     }
-    return lines.toString() + "\n";
+    return PdfTimesheetRenderer.renderAll(sheets, disclaimer);
+  }
+
+  public ProvisionalDay putProvisional(
+      Employee actor, LocalDate workDate, int workMinutes, int breakMinutes, String note) {
+    OrgPeriodSettings settings = orgSettings.getOrDefault(actor.orgId());
+    if (settings.closeByDay() <= 0) {
+      throw new IllegalArgumentException("closeByDay is not configured; set org period-settings first");
+    }
+    if (workDate.getDayOfMonth() <= settings.closeByDay()) {
+      throw new IllegalArgumentException(
+          "provisional days are only for dates after closeByDay=" + settings.closeByDay());
+    }
+    assertPeriodOpen(actor.orgId(), workDate);
+    if (workMinutes < 0 || breakMinutes < 0) {
+      throw new IllegalArgumentException("minutes must be >= 0");
+    }
+    if (!punches.findByEmployeeAndWorkDate(actor.id(), workDate).isEmpty()) {
+      throw new IllegalArgumentException("real punches already exist for this date");
+    }
+    ProvisionalDay row =
+        new ProvisionalDay(
+            actor.id(),
+            workDate,
+            workMinutes,
+            breakMinutes,
+            note == null ? "" : note.trim());
+    provisionals.save(row);
+    return row;
   }
 
   public List<Employee> unpunched(Employee actor, LocalDate workDate) {
@@ -341,8 +412,23 @@ public class AttendanceService {
   }
 
   public OrgPeriodSettings putPeriodSettings(Employee actor, int periodAnchorDay) {
+    OrgPeriodSettings cur = orgSettings.getOrDefault(actor.orgId());
+    return putPeriodSettings(
+        actor,
+        new OrgPeriodSettings(
+            actor.orgId(),
+            periodAnchorDay,
+            cur.closeByDay(),
+            cur.csvProfileId(),
+            cur.csvIncludeHeader(),
+            cur.csvColumns()));
+  }
+
+  public OrgPeriodSettings putPeriodSettings(Employee actor, OrgPeriodSettings next) {
     requireManager(actor);
-    OrgPeriodSettings next = new OrgPeriodSettings(actor.orgId(), periodAnchorDay);
+    if (!actor.orgId().equals(next.orgId())) {
+      throw new ForbiddenException("org mismatch");
+    }
     orgSettings.save(next);
     return next;
   }

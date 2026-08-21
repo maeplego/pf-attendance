@@ -8,4 +8,15 @@ public record DailySummary(
     int workMinutes,
     int breakMinutes,
     PunchState status,
-    List<PunchEvent> punches) {}
+    List<PunchEvent> punches,
+    boolean provisional) {
+
+  public DailySummary(
+      LocalDate workDate,
+      int workMinutes,
+      int breakMinutes,
+      PunchState status,
+      List<PunchEvent> punches) {
+    this(workDate, workMinutes, breakMinutes, status, punches, false);
+  }
+}

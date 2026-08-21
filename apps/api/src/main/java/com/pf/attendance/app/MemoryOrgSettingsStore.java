@@ -11,7 +11,7 @@ public class MemoryOrgSettingsStore implements OrgSettingsStore {
 
   @Override
   public OrgPeriodSettings getOrDefault(String orgId) {
-    return byOrg.getOrDefault(orgId, new OrgPeriodSettings(orgId, 1));
+    return byOrg.getOrDefault(orgId, OrgPeriodSettings.defaults(orgId));
   }
 
   @Override

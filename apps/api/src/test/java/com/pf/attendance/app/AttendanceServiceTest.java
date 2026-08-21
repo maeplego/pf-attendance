@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,7 @@ class AttendanceServiceTest {
     handoff = new MockTimesheetHandoffAdapter();
     visibility = new MemoryWorksiteVisibilityStore();
     orgSettings = new MemoryOrgSettingsStore();
+    MemoryProvisionalDayStore provisionals = new MemoryProvisionalDayStore();
     clock = new MutableClock(Instant.parse("2026-08-19T00:00:00Z"));
     for (Employee employee : DemoEmployees.roster()) {
       employees.save(employee);
@@ -61,7 +63,8 @@ class AttendanceServiceTest {
     sato = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "sato.mei").orElseThrow();
     ise = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "ise.yuto").orElseThrow();
     service =
-        new AttendanceService(employees, punches, workflow, handoff, visibility, orgSettings, clock);
+        new AttendanceService(
+            employees, punches, workflow, handoff, visibility, orgSettings, provisionals, clock);
   }
 
   @Test
@@ -234,6 +237,35 @@ class AttendanceServiceTest {
     clock.setInstant(Instant.parse("2026-08-21T01:00:00Z")); // JST 08-21 10:00 → period 2026-09
     PunchEvent ok = service.punch(aoki.id(), PunchType.CLOCK_IN);
     assertThat(ok.workDate()).isEqualTo(LocalDate.of(2026, 8, 21));
+  }
+
+  @Test
+  void csvProfileAndProvisionalAndPdf() {
+    service.putPeriodSettings(
+        sato,
+        new OrgPeriodSettings(
+            DemoEmployees.ORG_A, 1, 25, "erp-generic-ja", false, List.of()));
+    service.putProvisional(aoki, LocalDate.of(2026, 8, 26), 480, 60, "見込み");
+    var day = service.dailySummary(aoki.id(), LocalDate.of(2026, 8, 26));
+    assertThat(day.provisional()).isTrue();
+    assertThat(day.workMinutes()).isEqualTo(480);
+
+    String csv = service.monthCsv(sato, YearMonth.of(2026, 8), "erp-generic-ja", false, List.of());
+    assertThat(csv).doesNotStartWith("sub,");
+    assertThat(csv).contains("aoki.haru,2026-08-26,480,60,provisional,1");
+
+    String custom =
+        service.monthCsv(
+            sato,
+            YearMonth.of(2026, 8),
+            "custom",
+            true,
+            List.of("workDate", "sub", "workMinutes"));
+    assertThat(custom.split("\n", 2)[0]).isEqualTo("workDate,sub,workMinutes");
+
+    byte[] pdf = service.monthPdf(sato, YearMonth.of(2026, 8), "aoki.haru");
+    assertThat(pdf.length).isGreaterThan(100);
+    assertThat(new String(pdf, 0, 4)).isEqualTo("%PDF");
   }
 
   private static final class MutableClock extends Clock {

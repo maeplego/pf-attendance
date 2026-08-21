@@ -184,6 +184,22 @@ export async function listHandoffs(sub: string, month: string) {
   }>;
 }
 
+export async function listVisibleMembers(sub: string) {
+  const res = await fetch(`${API}/v1/worksite/visible-members`, req(sub));
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{
+    orgId: string;
+    members: {
+      sub: string;
+      displayName: string;
+      kind: string;
+      employerOrgId: string;
+      worksiteName: string;
+      payrollOwnedHere: boolean;
+    }[];
+  }>;
+}
+
 export async function unpunched(sub: string, date: string) {
   const res = await fetch(`${API}/v1/reminders/unpunched?date=${encodeURIComponent(date)}`, req(sub));
   if (!res.ok) throw new Error(await readError(res));

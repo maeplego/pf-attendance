@@ -9,12 +9,20 @@ public final class DemoEmployees {
 
   private DemoEmployees() {}
 
-  /** Fictional 開発部. Names are not real people. Default org-demo-a. */
+  /** Default = employer org (SES company) roster. */
   public static List<Employee> roster() {
-    return roster(ORG_A);
+    return employerRoster(ORG_A);
   }
 
   public static List<Employee> roster(String orgId) {
+    if (ORG_B.equals(orgId)) {
+      return worksiteHostRoster(orgId);
+    }
+    return employerRoster(orgId);
+  }
+
+  /** Employer (SES) org: in-house + client_site assignees. */
+  public static List<Employee> employerRoster(String orgId) {
     String prefix = ORG_B.equals(orgId) ? "01J9EMPB" : "01J9EMPA";
     List<Employee> rows = new ArrayList<>();
     rows.add(Employee.employed(prefix + "000000000000000001", orgId, "aoki.haru", "青木 陽", "member"));
@@ -25,7 +33,6 @@ public final class DemoEmployees {
     rows.add(Employee.employed(prefix + "000000000000000006", orgId, "okada.ritsu", "岡田 律", "member"));
     rows.add(Employee.employed(prefix + "000000000000000007", orgId, "nakamura.nagi", "中村 凪", "member"));
     rows.add(Employee.employed(prefix + "000000000000000008", orgId, "takahashi.saku", "高橋 朔", "member"));
-    // SES-style: employed by this org, working at a fictional client worksite.
     rows.add(
         Employee.clientSite(
             prefix + "000000000000000009",
@@ -45,5 +52,17 @@ public final class DemoEmployees {
             "WS-CLIENT-B",
             "架空銀行 システム部"));
     return List.copyOf(rows);
+  }
+
+  /**
+   * Worksite (client) org host staff only. SES people are guests via {@code CrossOrgAssignment}, not
+   * employees here — so payroll CSV of this org cannot include them.
+   */
+  public static List<Employee> worksiteHostRoster(String orgId) {
+    String prefix = "01J9EMPB";
+    return List.of(
+        Employee.employed(prefix + "000000000000000001", orgId, "aoki.haru", "青木 陽", "member"),
+        Employee.employed(prefix + "000000000000000002", orgId, "sato.mei", "佐藤 芽衣", "manager"),
+        Employee.employed(prefix + "000000000000000003", orgId, "kondo.minato", "近藤 湊", "member"));
   }
 }

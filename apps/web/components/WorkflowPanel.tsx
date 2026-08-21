@@ -12,6 +12,7 @@ import {
   listApprovals,
   listHandoffs,
   listRequests,
+  listVisibleMembers,
   postAllocation,
   postRequest,
   unpunched,
@@ -35,6 +36,9 @@ export function WorkflowPanel() {
   const [allocs, setAllocs] = useState<TimeAllocationRow[]>([]);
   const [missing, setMissing] = useState<{ sub: string; displayName: string }[]>([]);
   const [handoffs, setHandoffs] = useState<{ id: string; lineCount: number; sourceHint: string }[]>([]);
+  const [visible, setVisible] = useState<
+    { sub: string; displayName: string; kind: string; worksiteName: string; payrollOwnedHere: boolean }[]
+  >([]);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
@@ -45,13 +49,26 @@ export function WorkflowPanel() {
       listApprovals(sub).catch(() => ({ requests: [] as WorkRequestRow[] })),
       unpunched(sub, allocDate).catch(() => ({ employees: [] as { sub: string; displayName: string }[] })),
       listHandoffs(sub, month).catch(() => ({ receipts: [] as { id: string; lineCount: number; sourceHint: string }[] })),
+      listVisibleMembers(sub).catch(
+        () =>
+          ({
+            members: [] as {
+              sub: string;
+              displayName: string;
+              kind: string;
+              worksiteName: string;
+              payrollOwnedHere: boolean;
+            }[],
+          }) as const,
+      ),
     ])
-      .then(([r, a, inboxBody, miss, hand]) => {
+      .then(([r, a, inboxBody, miss, hand, vis]) => {
         setMine(r.requests);
         setAllocs(a.allocations);
         setInbox(inboxBody.requests);
         setMissing(miss.employees ?? []);
         setHandoffs(hand.receipts ?? []);
+        setVisible(vis.members ?? []);
         setErr("");
       })
       .catch((e) => setErr(String(e)));
@@ -166,6 +183,20 @@ export function WorkflowPanel() {
         {allocs.map((a) => (
           <li key={a.id}>
             {a.project} {a.minutes} 分
+          </li>
+        ))}
+      </ul>
+
+      <h2>現場メンバー（自社 + 他社ゲスト読取）</h2>
+      <p className="muted">
+        Org B（客先）では SES をゲスト表示。給与 CSV にゲストは出ません（Org 切替は画面上部）。
+      </p>
+      <ul>
+        {visible.map((m) => (
+          <li key={`${m.kind}-${m.sub}`}>
+            {m.displayName} ({m.sub}) · {m.kind}
+            {m.kind === "guest" && m.worksiteName ? ` · ${m.worksiteName}` : ""}
+            {m.payrollOwnedHere ? "" : " · 給与は雇用主側"}
           </li>
         ))}
       </ul>

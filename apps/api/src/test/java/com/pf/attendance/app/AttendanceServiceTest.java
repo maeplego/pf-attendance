@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pf.attendance.app.handoff.MockTimesheetHandoffAdapter;
+import com.pf.attendance.app.worksite.CrossOrgAssignment;
+import com.pf.attendance.app.worksite.MemoryWorksiteVisibilityStore;
+import com.pf.attendance.app.worksite.VisibleMember;
 import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
 import com.pf.attendance.domain.PunchConflictException;
@@ -23,6 +26,7 @@ class AttendanceServiceTest {
   private MemoryPunchStore punches;
   private MemoryWorkflowStore workflow;
   private MockTimesheetHandoffAdapter handoff;
+  private MemoryWorksiteVisibilityStore visibility;
   private MutableClock clock;
   private AttendanceService service;
   private Employee aoki;
@@ -35,14 +39,26 @@ class AttendanceServiceTest {
     punches = new MemoryPunchStore();
     workflow = new MemoryWorkflowStore();
     handoff = new MockTimesheetHandoffAdapter();
+    visibility = new MemoryWorksiteVisibilityStore();
     clock = new MutableClock(Instant.parse("2026-08-19T00:00:00Z"));
     for (Employee employee : DemoEmployees.roster()) {
       employees.save(employee);
     }
+    for (Employee employee : DemoEmployees.worksiteHostRoster(DemoEmployees.ORG_B)) {
+      employees.save(employee);
+    }
+    visibility.save(
+        new CrossOrgAssignment(
+            "asgn1",
+            DemoEmployees.ORG_A,
+            DemoEmployees.ORG_B,
+            "ise.yuto",
+            "WS-CLIENT-A",
+            "架空商事 本社開発"));
     aoki = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "aoki.haru").orElseThrow();
     sato = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "sato.mei").orElseThrow();
     ise = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "ise.yuto").orElseThrow();
-    service = new AttendanceService(employees, punches, workflow, handoff, clock);
+    service = new AttendanceService(employees, punches, workflow, handoff, visibility, clock);
   }
 
   @Test
@@ -180,6 +196,24 @@ class AttendanceServiceTest {
                     "bad"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("client_site");
+  }
+
+  @Test
+  void worksiteSeesGuestsButPayrollCsvStaysEmployerOnly() {
+    Employee worksiteManager =
+        employees.findByOrgIdAndSub(DemoEmployees.ORG_B, "sato.mei").orElseThrow();
+    var members = service.listVisibleMembers(worksiteManager);
+    assertThat(members)
+        .anyMatch(m -> VisibleMember.KIND_GUEST.equals(m.kind()) && "ise.yuto".equals(m.sub()));
+    assertThat(members)
+        .anyMatch(m -> VisibleMember.KIND_LOCAL.equals(m.kind()) && "aoki.haru".equals(m.sub()));
+
+    String worksiteCsv = service.monthCsv(worksiteManager, YearMonth.of(2026, 8));
+    assertThat(worksiteCsv).doesNotContain("ise.yuto");
+    assertThat(worksiteCsv).contains("aoki.haru");
+
+    String employerCsv = service.monthCsv(sato, YearMonth.of(2026, 8));
+    assertThat(employerCsv).contains("ise.yuto");
   }
 
   private static final class MutableClock extends Clock {

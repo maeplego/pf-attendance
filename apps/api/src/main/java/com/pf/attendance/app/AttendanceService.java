@@ -4,6 +4,9 @@ import com.pf.attendance.app.handoff.HandoffCsv;
 import com.pf.attendance.app.handoff.HandoffDayLine;
 import com.pf.attendance.app.handoff.HandoffReceipt;
 import com.pf.attendance.app.handoff.TimesheetHandoffPort;
+import com.pf.attendance.app.worksite.CrossOrgAssignment;
+import com.pf.attendance.app.worksite.VisibleMember;
+import com.pf.attendance.app.worksite.WorksiteVisibilityStore;
 import com.pf.attendance.domain.DailyHoursCalculator;
 import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
@@ -28,6 +31,7 @@ public class AttendanceService {
   private final PunchStore punches;
   private final WorkflowStore workflow;
   private final TimesheetHandoffPort handoff;
+  private final WorksiteVisibilityStore visibility;
   private final Clock clock;
 
   public AttendanceService(
@@ -35,11 +39,13 @@ public class AttendanceService {
       PunchStore punches,
       WorkflowStore workflow,
       TimesheetHandoffPort handoff,
+      WorksiteVisibilityStore visibility,
       Clock clock) {
     this.employees = employees;
     this.punches = punches;
     this.workflow = workflow;
     this.handoff = handoff;
+    this.visibility = visibility;
     this.clock = clock;
   }
 
@@ -294,6 +300,42 @@ public class AttendanceService {
   public List<HandoffReceipt> listHandoffs(Employee actor, YearMonth month) {
     requireManager(actor);
     return handoff.list(actor.orgId(), month);
+  }
+
+  /**
+   * Worksite team board: local employees + cross-org guests (read-only). Guests are not in this
+   * org's employee table, so month CSV / payroll export cannot include them.
+   */
+  public List<VisibleMember> listVisibleMembers(Employee actor) {
+    List<VisibleMember> out = new ArrayList<>();
+    for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
+      out.add(
+          new VisibleMember(
+              employee.sub(),
+              employee.displayName(),
+              employee.role(),
+              VisibleMember.KIND_LOCAL,
+              actor.orgId(),
+              employee.worksiteCode(),
+              employee.worksiteName()));
+    }
+    for (CrossOrgAssignment a : visibility.findByWorksiteOrgId(actor.orgId())) {
+      String displayName =
+          employees
+              .findByOrgIdAndSub(a.employerOrgId(), a.employeeSub())
+              .map(Employee::displayName)
+              .orElse(a.employeeSub());
+      out.add(
+          new VisibleMember(
+              a.employeeSub(),
+              displayName,
+              "guest",
+              VisibleMember.KIND_GUEST,
+              a.employerOrgId(),
+              a.worksiteCode(),
+              a.worksiteName()));
+    }
+    return List.copyOf(out);
   }
 
   private static void requireManager(Employee actor) {

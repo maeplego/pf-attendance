@@ -39,7 +39,8 @@ public class WorkflowController {
   public Map<String, Object> submit(HttpServletRequest request, @Valid @RequestBody RequestBodyDto body) {
     Employee employee = EmployeePrincipal.require(request);
     WorkRequest row =
-        attendance.submitRequest(employee.id(), body.type(), LocalDate.parse(body.workDate()), body.reason());
+        attendance.submitRequest(
+            employee.id(), body.type(), LocalDate.parse(body.workDate()), body.reason(), body.leaveKind());
     return toRequest(row);
   }
 
@@ -150,6 +151,7 @@ public class WorkflowController {
     out.put("status", row.status());
     out.put("workDate", row.workDate().toString());
     out.put("reason", row.reason());
+    out.put("leaveKind", row.leaveKind());
     out.put("createdAt", row.createdAt().toString());
     out.put("decidedAt", row.decidedAt() == null ? null : row.decidedAt().toString());
     out.put("decidedBy", row.decidedBy());
@@ -165,7 +167,11 @@ public class WorkflowController {
         "minutes", row.minutes());
   }
 
-  public record RequestBodyDto(@NotBlank String type, @NotBlank String workDate, @NotBlank String reason) {}
+  public record RequestBodyDto(
+      @NotBlank String type,
+      @NotBlank String workDate,
+      @NotBlank String reason,
+      String leaveKind) {}
 
   public record DecisionBody(boolean approve) {}
 

@@ -36,6 +36,7 @@ public class JpaWorkflowStore implements WorkflowStore {
             request.status(),
             request.workDate(),
             request.reason(),
+            request.leaveKind(),
             request.createdAt(),
             request.decidedAt(),
             request.decidedBy()));
@@ -99,6 +100,7 @@ public class JpaWorkflowStore implements WorkflowStore {
         e.getStatus(),
         e.getWorkDate(),
         e.getReason(),
+        e.getLeaveKind(),
         e.getCreatedAt(),
         e.getDecidedAt(),
         e.getDecidedBy());

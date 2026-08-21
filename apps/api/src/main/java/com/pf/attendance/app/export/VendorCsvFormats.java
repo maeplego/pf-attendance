@@ -1,6 +1,7 @@
 package com.pf.attendance.app.export;
 
 import com.pf.attendance.app.Employee;
+import com.pf.attendance.app.LeaveKind;
 import com.pf.attendance.domain.AttendancePeriods;
 import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
@@ -75,15 +76,25 @@ public final class VendorCsvFormats {
    * Overtime / holiday breakdown fields are emitted as 0 — P09 does not compute 36-hour OT categories.
    * Source columns listed in freee help / KOT「freee人事労務とのCSV連携」articles (retrieved 2026-08-21).
    */
-  public static String freeeHrMonthlyCsv(List<Employee> employees, YearMonth period, List<MonthSummary> summaries) {
+  public static String freeeHrMonthlyCsv(
+      List<Employee> employees,
+      YearMonth period,
+      List<MonthSummary> summaries,
+      List<Integer> paidLeaveDays) {
     StringJoiner lines = new StringJoiner("\n");
     lines.add(
         "従業員番号,氏名,所定労働時間（分）,法定内残業時間（分）,時間外労働時間（分）,深夜労働時間（分）,法定休日労働時間（分）,総労働時間（分）,総労働日数,所定労働出勤日数,所定休日出勤日数,法定休日出勤日数,遅刻時間（分）,早退時間（分）,欠勤日数,遅刻日数,早退日数,有休取得日数,集計開始日,集計終了日");
     for (int i = 0; i < employees.size(); i++) {
       Employee employee = employees.get(i);
       MonthSummary summary = summaries.get(i);
+      int leaveDays = paidLeaveDays == null || i >= paidLeaveDays.size() ? 0 : paidLeaveDays.get(i);
       int totalWork = 0;
       int workDays = 0;
+      int lateMinutes = 0;
+      int earlyMinutes = 0;
+      int lateDays = 0;
+      int earlyDays = 0;
+      int absenceDays = 0;
       LocalDate first = null;
       LocalDate last = null;
       for (DailySummary day : summary.days()) {
@@ -95,13 +106,24 @@ public final class VendorCsvFormats {
         if (day.workMinutes() > 0 || day.provisional()) {
           workDays++;
         }
+        lateMinutes += day.lateMinutes();
+        earlyMinutes += day.earlyLeaveMinutes();
+        if (day.lateMinutes() > 0) {
+          lateDays++;
+        }
+        if (day.earlyLeaveMinutes() > 0) {
+          earlyDays++;
+        }
+        if (LeaveKind.ABSENCE.equals(day.leaveKind())) {
+          absenceDays++;
+        }
       }
       lines.add(
           String.join(
               ",",
               csv(employee.sub()),
               csv(employee.displayName()),
-              "0", // 所定 — not modeled in P09
+              "0",
               "0",
               "0",
               "0",
@@ -111,12 +133,12 @@ public final class VendorCsvFormats {
               Integer.toString(workDays),
               "0",
               "0",
-              "0",
-              "0",
-              "0",
-              "0",
-              "0",
-              "0",
+              Integer.toString(lateMinutes),
+              Integer.toString(earlyMinutes),
+              Integer.toString(absenceDays),
+              Integer.toString(lateDays),
+              Integer.toString(earlyDays),
+              Integer.toString(leaveDays),
               first == null ? "" : first.format(ISO_DATE),
               last == null ? "" : last.format(ISO_DATE)));
     }

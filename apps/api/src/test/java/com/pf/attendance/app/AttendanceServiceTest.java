@@ -11,11 +11,13 @@ import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
 import com.pf.attendance.domain.PunchConflictException;
 import com.pf.attendance.domain.PunchEvent;
+import com.pf.attendance.domain.PunchState;
 import com.pf.attendance.domain.PunchType;
 import com.pf.attendance.domain.WorkDates;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -244,7 +246,8 @@ class AttendanceServiceTest {
     service.putPeriodSettings(
         sato,
         new OrgPeriodSettings(
-            DemoEmployees.ORG_A, 1, 25, "erp-generic-ja", false, List.of()));
+            DemoEmployees.ORG_A, 1, 25, "erp-generic-ja", false, List.of(),
+            "09:00", "18:00", 60, "fixed"));
     service.putProvisional(aoki, LocalDate.of(2026, 8, 26), 480, 60, "見込み");
     var day = service.dailySummary(aoki.id(), LocalDate.of(2026, 8, 26));
     assertThat(day.provisional()).isTrue();
@@ -287,6 +290,33 @@ class AttendanceServiceTest {
     assertThat(freee).startsWith("従業員番号,氏名,所定労働時間（分）");
     assertThat(freee).contains("aoki.haru");
     assertThat(freee).contains("総労働時間（分）");
+  }
+
+  @Test
+  void scheduleBackfillLeaveAndLate() {
+    LocalDate day = LocalDate.of(2026, 8, 18);
+    List<PunchEvent> applied = service.applyScheduleDay(aoki.id(), day);
+    assertThat(applied).hasSize(4);
+    DailySummary ok = service.dailySummary(aoki.id(), day);
+    assertThat(ok.workMinutes()).isEqualTo(480);
+    assertThat(ok.breakMinutes()).isEqualTo(60);
+    assertThat(ok.lateMinutes()).isZero();
+
+    PunchEvent lateIn =
+        service.punch(aoki.id(), PunchType.CLOCK_IN, LocalDate.of(2026, 8, 17), LocalTime.of(9, 30));
+    assertThat(lateIn.source()).isEqualTo("manual");
+    service.punch(aoki.id(), PunchType.CLOCK_OUT, LocalDate.of(2026, 8, 17), LocalTime.of(18, 0));
+    DailySummary lateDay = service.dailySummary(aoki.id(), LocalDate.of(2026, 8, 17));
+    assertThat(lateDay.lateMinutes()).isEqualTo(30);
+
+    WorkRequest leave =
+        service.submitRequest(
+            aoki.id(), WorkRequest.LEAVE, LocalDate.of(2026, 8, 15), "リフレッシュ", "paid");
+    service.decide(sato, leave.id(), true);
+    DailySummary leaveDay = service.dailySummary(aoki.id(), LocalDate.of(2026, 8, 15));
+    assertThat(leaveDay.status()).isEqualTo(PunchState.ON_LEAVE);
+    assertThat(leaveDay.leaveKind()).isEqualTo("paid");
+    assertThat(leaveDay.workMinutes()).isEqualTo(480);
   }
 
   private static final class MutableClock extends Clock {

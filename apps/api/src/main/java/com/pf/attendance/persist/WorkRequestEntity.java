@@ -29,6 +29,9 @@ public class WorkRequestEntity {
   @Column(nullable = false)
   private String reason;
 
+  @Column(name = "leave_kind", nullable = false, length = 32)
+  private String leaveKind = "";
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -47,6 +50,7 @@ public class WorkRequestEntity {
       String status,
       LocalDate workDate,
       String reason,
+      String leaveKind,
       Instant createdAt,
       Instant decidedAt,
       String decidedBy) {
@@ -56,6 +60,7 @@ public class WorkRequestEntity {
     this.status = status;
     this.workDate = workDate;
     this.reason = reason;
+    this.leaveKind = leaveKind == null ? "" : leaveKind;
     this.createdAt = createdAt;
     this.decidedAt = decidedAt;
     this.decidedBy = decidedBy;
@@ -83,6 +88,10 @@ public class WorkRequestEntity {
 
   public String getReason() {
     return reason;
+  }
+
+  public String getLeaveKind() {
+    return leaveKind;
   }
 
   public Instant getCreatedAt() {

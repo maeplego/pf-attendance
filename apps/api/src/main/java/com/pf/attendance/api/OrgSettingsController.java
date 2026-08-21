@@ -43,7 +43,11 @@ public class OrgSettingsController {
             body.closeByDay() != null ? body.closeByDay() : cur.closeByDay(),
             body.csvProfileId() != null ? body.csvProfileId() : cur.csvProfileId(),
             body.csvIncludeHeader() != null ? body.csvIncludeHeader() : cur.csvIncludeHeader(),
-            body.csvColumns() != null ? body.csvColumns() : cur.csvColumns());
+            body.csvColumns() != null ? body.csvColumns() : cur.csvColumns(),
+            body.scheduledStart() != null ? body.scheduledStart() : cur.scheduledStart(),
+            body.scheduledEnd() != null ? body.scheduledEnd() : cur.scheduledEnd(),
+            body.breakMinutes() != null ? body.breakMinutes() : cur.breakMinutes(),
+            body.breakMode() != null ? body.breakMode() : cur.breakMode());
     return toMap(attendance.putPeriodSettings(actor, next));
   }
 
@@ -89,6 +93,11 @@ public class OrgSettingsController {
     out.put("csvProfileId", s.csvProfileId());
     out.put("csvIncludeHeader", s.csvIncludeHeader());
     out.put("csvColumns", s.csvColumns());
+    out.put("scheduledStart", s.scheduledStart());
+    out.put("scheduledEnd", s.scheduledEnd());
+    out.put("breakMinutes", s.breakMinutes());
+    out.put("breakMode", s.breakMode());
+    out.put("scheduledNetMinutes", s.workSchedule().scheduledNetMinutes());
     return out;
   }
 
@@ -97,5 +106,9 @@ public class OrgSettingsController {
       @Min(0) @Max(28) Integer closeByDay,
       String csvProfileId,
       Boolean csvIncludeHeader,
-      List<String> csvColumns) {}
+      List<String> csvColumns,
+      String scheduledStart,
+      String scheduledEnd,
+      Integer breakMinutes,
+      String breakMode) {}
 }

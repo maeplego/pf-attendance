@@ -10,6 +10,7 @@ public record WorkRequest(
     String status,
     LocalDate workDate,
     String reason,
+    String leaveKind,
     Instant createdAt,
     Instant decidedAt,
     String decidedBy) {
@@ -18,4 +19,8 @@ public record WorkRequest(
   public static final String PENDING = "pending";
   public static final String APPROVED = "approved";
   public static final String REJECTED = "rejected";
+
+  public WorkRequest {
+    leaveKind = leaveKind == null ? "" : leaveKind;
+  }
 }

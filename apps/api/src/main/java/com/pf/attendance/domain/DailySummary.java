@@ -9,7 +9,11 @@ public record DailySummary(
     int breakMinutes,
     PunchState status,
     List<PunchEvent> punches,
-    boolean provisional) {
+    boolean provisional,
+    String leaveKind,
+    int lateMinutes,
+    int earlyLeaveMinutes,
+    int overtimeMinutes) {
 
   public DailySummary(
       LocalDate workDate,
@@ -17,6 +21,11 @@ public record DailySummary(
       int breakMinutes,
       PunchState status,
       List<PunchEvent> punches) {
-    this(workDate, workMinutes, breakMinutes, status, punches, false);
+    this(workDate, workMinutes, breakMinutes, status, punches, false, "", 0, 0, 0);
+  }
+
+  public DailySummary {
+    leaveKind = leaveKind == null ? "" : leaveKind;
+    punches = punches == null ? List.of() : List.copyOf(punches);
   }
 }

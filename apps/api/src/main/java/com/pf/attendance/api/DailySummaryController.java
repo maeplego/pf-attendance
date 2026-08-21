@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,15 +31,22 @@ public class DailySummaryController {
   public Map<String, Object> dailySummary(
       HttpServletRequest request, @RequestParam(required = false) String date) {
     Employee employee = EmployeePrincipal.require(request);
-    LocalDate workDate = date == null || date.isBlank() ? WorkDates.of(Instant.now(clock)) : LocalDate.parse(date);
+    LocalDate workDate =
+        date == null || date.isBlank() ? WorkDates.of(Instant.now(clock)) : LocalDate.parse(date);
     DailySummary summary = attendance.dailySummary(employee.id(), workDate);
     List<Map<String, Object>> punches =
         summary.punches().stream().map(PunchController::toJson).toList();
-    return Map.of(
-        "workDate", summary.workDate().toString(),
-        "workMinutes", summary.workMinutes(),
-        "breakMinutes", summary.breakMinutes(),
-        "status", summary.status().name().toLowerCase(Locale.ROOT),
-        "punches", punches);
+    Map<String, Object> out = new LinkedHashMap<>();
+    out.put("workDate", summary.workDate().toString());
+    out.put("workMinutes", summary.workMinutes());
+    out.put("breakMinutes", summary.breakMinutes());
+    out.put("status", summary.status().name().toLowerCase(Locale.ROOT));
+    out.put("punches", punches);
+    out.put("provisional", summary.provisional());
+    out.put("leaveKind", summary.leaveKind());
+    out.put("lateMinutes", summary.lateMinutes());
+    out.put("earlyLeaveMinutes", summary.earlyLeaveMinutes());
+    out.put("overtimeMinutes", summary.overtimeMinutes());
+    return out;
   }
 }

@@ -23,9 +23,12 @@ import com.pf.attendance.domain.PunchRules;
 import com.pf.attendance.domain.PunchState;
 import com.pf.attendance.domain.PunchType;
 import com.pf.attendance.domain.WorkDates;
+import com.pf.attendance.domain.ScheduleVariance;
+import com.pf.attendance.domain.WorkSchedule;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,31 +72,117 @@ public class AttendanceService {
   }
 
   public PunchEvent punch(String employeeId, PunchType type) {
+    return punch(employeeId, type, null, null);
+  }
+
+  /**
+   * Live punch when workDate/at are null. Manual / forgotten punch when workDate is set; at null
+   * uses org schedule defaults for clock_in / clock_out.
+   */
+  public PunchEvent punch(String employeeId, PunchType type, LocalDate workDate, LocalTime at) {
     Employee employee =
         employees
             .findById(employeeId)
             .orElseThrow(() -> new UnknownEmployeeException(employeeId));
     Instant now = Instant.now(clock);
-    LocalDate workDate = WorkDates.of(now);
-    assertPeriodOpen(employee.orgId(), workDate);
-    List<PunchEvent> existing = punches.findByEmployeeAndWorkDate(employee.id(), workDate);
+    LocalDate day = workDate == null ? WorkDates.of(now) : workDate;
+    assertPeriodOpen(employee.orgId(), day);
+    if (day.isAfter(WorkDates.of(now))) {
+      throw new IllegalArgumentException("cannot punch a future workDate");
+    }
+    WorkSchedule schedule = orgSettings.getOrDefault(employee.orgId()).workSchedule();
+    LocalTime time = at;
+    if (time == null && workDate != null) {
+      time =
+          switch (type) {
+            case CLOCK_IN -> schedule.scheduledStart();
+            case CLOCK_OUT -> schedule.scheduledEnd();
+            case BREAK_START -> schedule.breakStart();
+            case BREAK_END -> schedule.breakEnd();
+          };
+    }
+    Instant stamped =
+        workDate == null
+            ? now
+            : day.atTime(time).atZone(WorkDates.ZONE).toInstant();
+    List<PunchEvent> existing = punches.findByEmployeeAndWorkDate(employee.id(), day);
     PunchRules.assertAllowed(existing, type);
-    PunchEvent event =
-        new PunchEvent(Ids.ulid(), employee.id(), type, now, workDate, "web");
+    String source = workDate == null ? "web" : "manual";
+    PunchEvent event = new PunchEvent(Ids.ulid(), employee.id(), type, stamped, day, source);
     punches.append(event);
     return event;
   }
 
-  public DailySummary dailySummary(String employeeId, LocalDate workDate) {
-    if (employees.findById(employeeId).isEmpty()) {
-      throw new UnknownEmployeeException(employeeId);
+  /** Fill a full day from org schedule when the day has no punches yet. */
+  public List<PunchEvent> applyScheduleDay(String employeeId, LocalDate workDate) {
+    Employee employee =
+        employees.findById(employeeId).orElseThrow(() -> new UnknownEmployeeException(employeeId));
+    assertPeriodOpen(employee.orgId(), workDate);
+    if (workDate.isAfter(WorkDates.of(Instant.now(clock)))) {
+      throw new IllegalArgumentException("cannot apply schedule to a future workDate");
     }
+    if (!punches.findByEmployeeAndWorkDate(employeeId, workDate).isEmpty()) {
+      throw new IllegalArgumentException("day already has punches");
+    }
+    WorkSchedule schedule = orgSettings.getOrDefault(employee.orgId()).workSchedule();
+    List<PunchEvent> created = new ArrayList<>();
+    created.add(punch(employeeId, PunchType.CLOCK_IN, workDate, schedule.scheduledStart()));
+    if (schedule.breakMinutes() > 0) {
+      created.add(punch(employeeId, PunchType.BREAK_START, workDate, schedule.breakStart()));
+      created.add(punch(employeeId, PunchType.BREAK_END, workDate, schedule.breakEnd()));
+    }
+    created.add(punch(employeeId, PunchType.CLOCK_OUT, workDate, schedule.scheduledEnd()));
+    return List.copyOf(created);
+  }
+
+  public DailySummary dailySummary(String employeeId, LocalDate workDate) {
+    Employee employee =
+        employees.findById(employeeId).orElseThrow(() -> new UnknownEmployeeException(employeeId));
+    WorkSchedule schedule = orgSettings.getOrDefault(employee.orgId()).workSchedule();
     List<PunchEvent> events = punches.findByEmployeeAndWorkDate(employeeId, workDate);
     Instant asOf = WorkDates.of(Instant.now(clock)).equals(workDate) ? Instant.now(clock) : null;
     DailySummary computed = DailyHoursCalculator.compute(workDate, events, asOf);
+    ScheduleVariance.Result variance =
+        ScheduleVariance.compute(schedule, events, computed.workMinutes());
+
+    Optional<WorkRequest> approvedLeave =
+        workflow.listRequestsForEmployee(employeeId).stream()
+            .filter(r -> WorkRequest.LEAVE.equals(r.type()))
+            .filter(r -> WorkRequest.APPROVED.equals(r.status()))
+            .filter(r -> r.workDate().equals(workDate))
+            .findFirst();
+
     if (!events.isEmpty()) {
-      return computed;
+      return new DailySummary(
+          workDate,
+          computed.workMinutes(),
+          computed.breakMinutes(),
+          computed.status(),
+          events,
+          false,
+          approvedLeave.map(WorkRequest::leaveKind).orElse(""),
+          variance.lateMinutes(),
+          variance.earlyLeaveMinutes(),
+          variance.overtimeMinutes());
     }
+
+    if (approvedLeave.isPresent()) {
+      String kind = approvedLeave.get().leaveKind();
+      int net = schedule.scheduledNetMinutes();
+      int work =
+          switch (kind) {
+            case LeaveKind.ABSENCE -> 0;
+            case LeaveKind.AM_HALF, LeaveKind.PM_HALF -> net / 2;
+            default -> net; // paid
+          };
+      int brk =
+          LeaveKind.ABSENCE.equals(kind)
+              ? 0
+              : LeaveKind.isHalf(kind) ? schedule.breakMinutes() / 2 : schedule.breakMinutes();
+      return new DailySummary(
+          workDate, work, brk, PunchState.ON_LEAVE, List.of(), false, kind, 0, 0, 0);
+    }
+
     Optional<ProvisionalDay> provisional = provisionals.find(employeeId, workDate);
     if (provisional.isPresent()) {
       ProvisionalDay p = provisional.get();
@@ -103,9 +192,23 @@ public class AttendanceService {
           p.breakMinutes(),
           PunchState.PROVISIONAL,
           List.of(),
-          true);
+          true,
+          "",
+          0,
+          0,
+          0);
     }
-    return computed;
+    return new DailySummary(
+        workDate,
+        computed.workMinutes(),
+        computed.breakMinutes(),
+        computed.status(),
+        List.of(),
+        false,
+        "",
+        0,
+        0,
+        0);
   }
 
   public MonthSummary monthSummary(String employeeId, YearMonth month) {
@@ -122,7 +225,13 @@ public class AttendanceService {
     return new MonthSummary(month, List.copyOf(days));
   }
 
-  public WorkRequest submitRequest(String employeeId, String type, LocalDate workDate, String reason) {
+  public WorkRequest submitRequest(
+      String employeeId, String type, LocalDate workDate, String reason) {
+    return submitRequest(employeeId, type, workDate, reason, null);
+  }
+
+  public WorkRequest submitRequest(
+      String employeeId, String type, LocalDate workDate, String reason, String leaveKind) {
     Employee employee =
         employees.findById(employeeId).orElseThrow(() -> new UnknownEmployeeException(employeeId));
     if (!WorkRequest.LEAVE.equals(type) && !WorkRequest.PUNCH_CORRECTION.equals(type)) {
@@ -132,6 +241,7 @@ public class AttendanceService {
       throw new IllegalArgumentException("reason is required");
     }
     assertPeriodOpen(employee.orgId(), workDate);
+    String kind = LeaveKind.normalize(type, leaveKind);
     WorkRequest row =
         new WorkRequest(
             Ids.ulid(),
@@ -140,6 +250,7 @@ public class AttendanceService {
             WorkRequest.PENDING,
             workDate,
             reason.trim(),
+            kind,
             Instant.now(clock),
             null,
             null);
@@ -185,6 +296,7 @@ public class AttendanceService {
             approve ? WorkRequest.APPROVED : WorkRequest.REJECTED,
             existing.workDate(),
             existing.reason(),
+            existing.leaveKind(),
             existing.createdAt(),
             Instant.now(clock),
             actor.sub());
@@ -253,10 +365,12 @@ public class AttendanceService {
     }
     if (VendorCsvFormats.FREEE_HR_MONTHLY_V1.equals(profile)) {
       List<MonthSummary> summaries = new ArrayList<>();
+      List<Integer> paidLeaveDays = new ArrayList<>();
       for (Employee employee : orgEmployees) {
         summaries.add(monthSummary(employee.id(), month));
+        paidLeaveDays.add(countApprovedPaidLeaveDays(employee.id(), month));
       }
-      return VendorCsvFormats.freeeHrMonthlyCsv(orgEmployees, month, summaries);
+      return VendorCsvFormats.freeeHrMonthlyCsv(orgEmployees, month, summaries, paidLeaveDays);
     }
 
     boolean header = includeHeader == null ? settings.csvIncludeHeader() : includeHeader;
@@ -439,7 +553,11 @@ public class AttendanceService {
             cur.closeByDay(),
             cur.csvProfileId(),
             cur.csvIncludeHeader(),
-            cur.csvColumns()));
+            cur.csvColumns(),
+            cur.scheduledStart(),
+            cur.scheduledEnd(),
+            cur.breakMinutes(),
+            cur.breakMode()));
   }
 
   public OrgPeriodSettings putPeriodSettings(Employee actor, OrgPeriodSettings next) {
@@ -449,6 +567,27 @@ public class AttendanceService {
     }
     orgSettings.save(next);
     return next;
+  }
+
+  private int countApprovedPaidLeaveDays(String employeeId, YearMonth month) {
+    Employee employee =
+        employees.findById(employeeId).orElseThrow(() -> new UnknownEmployeeException(employeeId));
+    int anchor = orgSettings.getOrDefault(employee.orgId()).periodAnchorDay();
+    LocalDate start = AttendancePeriods.startInclusive(month, anchor);
+    LocalDate end = AttendancePeriods.endInclusive(month, anchor);
+    int count = 0;
+    for (WorkRequest row : workflow.listRequestsForEmployee(employeeId)) {
+      if (!WorkRequest.LEAVE.equals(row.type()) || !WorkRequest.APPROVED.equals(row.status())) {
+        continue;
+      }
+      if (row.workDate().isBefore(start) || row.workDate().isAfter(end)) {
+        continue;
+      }
+      if (LeaveKind.PAID.equals(row.leaveKind())) {
+        count++;
+      }
+    }
+    return count;
   }
 
   private void assertPeriodOpen(String orgId, LocalDate workDate) {

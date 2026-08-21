@@ -3,6 +3,8 @@ package com.pf.attendance.app;
 import com.pf.attendance.app.export.CsvColumn;
 import com.pf.attendance.app.export.CsvExportProfile;
 import com.pf.attendance.domain.AttendancePeriods;
+import com.pf.attendance.domain.WorkSchedule;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public record OrgPeriodSettings(
@@ -11,7 +13,13 @@ public record OrgPeriodSettings(
     int closeByDay,
     String csvProfileId,
     boolean csvIncludeHeader,
-    List<String> csvColumns) {
+    List<String> csvColumns,
+    String scheduledStart,
+    String scheduledEnd,
+    int breakMinutes,
+    String breakMode) {
+
+  private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("HH:mm");
 
   public OrgPeriodSettings {
     periodAnchorDay = AttendancePeriods.normalizeAnchor(periodAnchorDay);
@@ -24,9 +32,41 @@ public record OrgPeriodSettings(
     for (String col : csvColumns) {
       CsvColumn.parse(col);
     }
+    WorkSchedule schedule = toSchedule(scheduledStart, scheduledEnd, breakMinutes, breakMode);
+    scheduledStart = schedule.scheduledStart().format(HM);
+    scheduledEnd = schedule.scheduledEnd().format(HM);
+    breakMinutes = schedule.breakMinutes();
+    breakMode = schedule.breakMode().wire();
+  }
+
+  public WorkSchedule workSchedule() {
+    return toSchedule(scheduledStart, scheduledEnd, breakMinutes, breakMode);
   }
 
   public static OrgPeriodSettings defaults(String orgId) {
-    return new OrgPeriodSettings(orgId, 1, 0, CsvExportProfile.MINUTES_V1, true, List.of());
+    WorkSchedule s = WorkSchedule.defaults();
+    return new OrgPeriodSettings(
+        orgId,
+        1,
+        0,
+        CsvExportProfile.MINUTES_V1,
+        true,
+        List.of(),
+        s.scheduledStart().format(HM),
+        s.scheduledEnd().format(HM),
+        s.breakMinutes(),
+        s.breakMode().wire());
+  }
+
+  private static WorkSchedule toSchedule(String start, String end, int breakMinutes, String breakMode) {
+    WorkSchedule.BreakMode mode = WorkSchedule.BreakMode.fromWire(breakMode);
+    String s = start == null || start.isBlank() ? "09:00" : start;
+    String e = end == null || end.isBlank() ? "18:00" : end;
+    int bm = breakMinutes < 0 ? 60 : breakMinutes;
+    return new WorkSchedule(
+        WorkSchedule.parseTime(s, "scheduledStart"),
+        WorkSchedule.parseTime(e, "scheduledEnd"),
+        bm,
+        mode);
   }
 }

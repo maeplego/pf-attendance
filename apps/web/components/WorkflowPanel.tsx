@@ -29,6 +29,7 @@ export function WorkflowPanel() {
   const today = tokyoToday();
   const [sub, setSub] = useState("aoki.haru");
   const [type, setType] = useState("leave");
+  const [leaveKind, setLeaveKind] = useState("paid");
   const [workDate, setWorkDate] = useState(today);
   const [reason, setReason] = useState("有給");
   const [project, setProject] = useState("P09");
@@ -47,6 +48,10 @@ export function WorkflowPanel() {
   const [closeByDay, setCloseByDay] = useState(0);
   const [csvProfile, setCsvProfile] = useState("minutes-v1");
   const [csvHeader, setCsvHeader] = useState(true);
+  const [scheduledStart, setScheduledStart] = useState("09:00");
+  const [scheduledEnd, setScheduledEnd] = useState("18:00");
+  const [breakMinutes, setBreakMinutes] = useState(60);
+  const [breakMode, setBreakMode] = useState("fixed");
   const [provDate, setProvDate] = useState(today);
   const [provMinutes, setProvMinutes] = useState(480);
   const [err, setErr] = useState("");
@@ -84,6 +89,10 @@ export function WorkflowPanel() {
         setCloseByDay(period.closeByDay ?? 0);
         setCsvProfile(period.csvProfileId ?? "minutes-v1");
         setCsvHeader(period.csvIncludeHeader ?? true);
+        setScheduledStart(period.scheduledStart ?? "09:00");
+        setScheduledEnd(period.scheduledEnd ?? "18:00");
+        setBreakMinutes(period.breakMinutes ?? 60);
+        setBreakMode(period.breakMode ?? "fixed");
         setErr("");
       })
       .catch((e) => setErr(String(e)));
@@ -122,18 +131,26 @@ export function WorkflowPanel() {
       {info ? <p className="muted">{info}</p> : null}
 
       <h2>申請</h2>
-      <p className="muted">休暇または打刻修正。締め後の月は 409 です。</p>
+      <p className="muted">休暇（有給・午前休・午後休・欠勤）または打刻修正。締め後の月は 409 です。</p>
       <div className="punch-row">
         <select value={type} onChange={(e) => setType(e.target.value)}>
           <option value="leave">休暇</option>
           <option value="punch_correction">打刻修正</option>
         </select>
+        {type === "leave" ? (
+          <select value={leaveKind} onChange={(e) => setLeaveKind(e.target.value)}>
+            <option value="paid">有給</option>
+            <option value="am_half">午前休</option>
+            <option value="pm_half">午後休</option>
+            <option value="absence">欠勤</option>
+          </select>
+        ) : null}
         <input value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
         <input value={reason} onChange={(e) => setReason(e.target.value)} />
         <button
           type="button"
           onClick={() =>
-            postRequest(sub, type, workDate, reason)
+            postRequest(sub, type, workDate, reason, type === "leave" ? leaveKind : undefined)
               .then(() => {
                 setInfo("申請を提出しました。");
                 reload();
@@ -147,7 +164,8 @@ export function WorkflowPanel() {
       <ul>
         {mine.map((r) => (
           <li key={r.id}>
-            {r.workDate} {r.type} {r.status} — {r.reason}
+            {r.workDate} {r.type}
+            {r.leaveKind ? `/${r.leaveKind}` : ""} {r.status} — {r.reason}
           </li>
         ))}
       </ul>
@@ -202,9 +220,10 @@ export function WorkflowPanel() {
         ))}
       </ul>
 
-      <h2>集計期間・締め日・CSV 形式</h2>
+      <h2>集計期間・勤務プロファイル・CSV</h2>
       <p className="muted">
-        periodAnchorDay: 1=暦月 / 21=21日起算。closeByDay: 25 なら 26 日以降は見込み入力可。CSV はプリセットまたは列カスタム（ERP 認証形式ではない）。
+        periodAnchorDay / closeByDay に加え、始業・定時・休憩（fixed または labor_hint）。labor_hint は 6h/8h
+        の教育用閾値で、法令準拠を名乗りません。KOT 等は列マッピング型なので custom CSV で合わせます。
       </p>
       <div className="punch-row">
         <label>
@@ -228,11 +247,35 @@ export function WorkflowPanel() {
           />
         </label>
         <label>
+          始業
+          <input value={scheduledStart} onChange={(e) => setScheduledStart(e.target.value)} />
+        </label>
+        <label>
+          定時
+          <input value={scheduledEnd} onChange={(e) => setScheduledEnd(e.target.value)} />
+        </label>
+        <label>
+          休憩分
+          <input
+            type="number"
+            min={0}
+            value={breakMinutes}
+            onChange={(e) => setBreakMinutes(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          休憩モード
+          <select value={breakMode} onChange={(e) => setBreakMode(e.target.value)}>
+            <option value="fixed">fixed</option>
+            <option value="labor_hint">labor_hint</option>
+          </select>
+        </label>
+        <label>
           CSV profile
           <select value={csvProfile} onChange={(e) => setCsvProfile(e.target.value)}>
             <option value="minutes-v1">minutes-v1 (P16)</option>
             <option value="mf-attendance-punch-v1">Money Forward 打刻 (公式)</option>
-            <option value="freee-hr-monthly-v1">freee 月次 (公式列・OTは0)</option>
+            <option value="freee-hr-monthly-v1">freee 月次 (公式列・OT内訳は0)</option>
             <option value="erp-generic-ja">erp-generic-ja (非公式例)</option>
             <option value="custom">custom</option>
           </select>
@@ -253,13 +296,23 @@ export function WorkflowPanel() {
               closeByDay,
               csvProfileId: csvProfile,
               csvIncludeHeader: csvHeader,
+              scheduledStart,
+              scheduledEnd,
+              breakMinutes,
+              breakMode,
             })
               .then((s) => {
                 setAnchorDay(s.periodAnchorDay);
                 setCloseByDay(s.closeByDay);
                 setCsvProfile(s.csvProfileId);
                 setCsvHeader(s.csvIncludeHeader);
-                setInfo(`設定を保存しました（closeByDay=${s.closeByDay}）。`);
+                setScheduledStart(s.scheduledStart);
+                setScheduledEnd(s.scheduledEnd);
+                setBreakMinutes(s.breakMinutes);
+                setBreakMode(s.breakMode);
+                setInfo(
+                  `設定を保存しました（所定${s.scheduledNetMinutes}分 / closeByDay=${s.closeByDay}）。`,
+                );
                 setErr("");
               })
               .catch((e) => setErr(String(e)))

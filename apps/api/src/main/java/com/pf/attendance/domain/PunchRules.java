@@ -43,7 +43,8 @@ public final class PunchRules {
         throw new PunchConflictException("end the break before clock_out or another break");
       }
       case CLOCKED_OUT -> throw new PunchConflictException("already clocked out for this work date");
-      case PROVISIONAL -> throw new PunchConflictException("provisional estimate is not a punch state");
+      case PROVISIONAL, ON_LEAVE ->
+          throw new PunchConflictException("leave/provisional day is not a punch state");
     };
   }
 

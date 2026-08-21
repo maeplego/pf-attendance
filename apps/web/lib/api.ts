@@ -15,6 +15,11 @@ export type DailySummary = {
   breakMinutes: number;
   status: string;
   punches: Punch[];
+  provisional?: boolean;
+  leaveKind?: string;
+  lateMinutes?: number;
+  earlyLeaveMinutes?: number;
+  overtimeMinutes?: number;
 };
 
 export type Me = {
@@ -107,14 +112,42 @@ export async function getMonthSummary(sub: string, month: string): Promise<Month
   return res.json();
 }
 
-export async function postPunch(sub: string, type: string): Promise<Punch> {
-  const res = await fetch(`${API}/v1/punches`, req(sub, { method: "POST", body: JSON.stringify({ type }) }));
+export async function postPunch(
+  sub: string,
+  type: string,
+  opts?: { workDate?: string; at?: string },
+): Promise<Punch> {
+  const body: { type: string; workDate?: string; at?: string } = { type };
+  if (opts?.workDate) body.workDate = opts.workDate;
+  if (opts?.at) body.at = opts.at;
+  const res = await fetch(`${API}/v1/punches`, req(sub, { method: "POST", body: JSON.stringify(body) }));
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
 
-export async function postRequest(sub: string, type: string, workDate: string, reason: string) {
-  const res = await fetch(`${API}/v1/requests`, req(sub, { method: "POST", body: JSON.stringify({ type, workDate, reason }) }));
+export async function applyScheduleDay(sub: string, date: string) {
+  const res = await fetch(
+    `${API}/v1/me/days/${encodeURIComponent(date)}/apply-schedule`,
+    req(sub, { method: "POST" }),
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ punches: Punch[] }>;
+}
+
+export async function postRequest(
+  sub: string,
+  type: string,
+  workDate: string,
+  reason: string,
+  leaveKind?: string,
+) {
+  const body: { type: string; workDate: string; reason: string; leaveKind?: string } = {
+    type,
+    workDate,
+    reason,
+  };
+  if (leaveKind) body.leaveKind = leaveKind;
+  const res = await fetch(`${API}/v1/requests`, req(sub, { method: "POST", body: JSON.stringify(body) }));
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
@@ -196,6 +229,10 @@ export async function putPeriodSettings(
     csvProfileId?: string;
     csvIncludeHeader?: boolean;
     csvColumns?: string[];
+    scheduledStart?: string;
+    scheduledEnd?: string;
+    breakMinutes?: number;
+    breakMode?: string;
   },
 ) {
   const res = await fetch(
@@ -209,6 +246,11 @@ export async function putPeriodSettings(
     closeByDay: number;
     csvProfileId: string;
     csvIncludeHeader: boolean;
+    scheduledStart: string;
+    scheduledEnd: string;
+    breakMinutes: number;
+    breakMode: string;
+    scheduledNetMinutes: number;
   }>;
 }
 
@@ -261,6 +303,11 @@ export async function getPeriodSettings(sub: string) {
     closeByDay: number;
     csvProfileId: string;
     csvIncludeHeader: boolean;
+    scheduledStart: string;
+    scheduledEnd: string;
+    breakMinutes: number;
+    breakMode: string;
+    scheduledNetMinutes: number;
   }>;
 }
 
@@ -276,6 +323,7 @@ export type WorkRequestRow = {
   status: string;
   workDate: string;
   reason: string;
+  leaveKind?: string;
 };
 
 export type TimeAllocationRow = {

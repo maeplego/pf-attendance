@@ -4,10 +4,12 @@ import com.pf.attendance.app.AttendanceService;
 import com.pf.attendance.app.Employee;
 import com.pf.attendance.app.OrgPeriodSettings;
 import com.pf.attendance.app.export.CsvExportProfiles;
+import com.pf.attendance.app.export.VendorCsvFormats;
 import com.pf.attendance.security.EmployeePrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,11 +49,12 @@ public class OrgSettingsController {
 
   @GetMapping("/v1/org/csv-profiles")
   public Map<String, Object> csvProfiles() {
-    return Map.of(
-        "profiles",
-        CsvExportProfiles.catalog().values().stream()
-            .map(
-                p ->
+    List<Map<String, Object>> profiles = new ArrayList<>();
+    CsvExportProfiles.catalog()
+        .values()
+        .forEach(
+            p ->
+                profiles.add(
                     Map.of(
                         "id",
                         p.id(),
@@ -60,10 +63,22 @@ public class OrgSettingsController {
                         "includeHeader",
                         p.includeHeader(),
                         "columns",
-                        p.columns().stream().map(c -> c.header()).toList()))
-            .toList(),
-        "customId",
-        "custom");
+                        p.columns().stream().map(c -> c.header()).toList(),
+                        "fidelity",
+                        "portfolio",
+                        "sourceUrl",
+                        "")));
+    for (VendorCsvFormats.CatalogEntry e : VendorCsvFormats.catalogEntries()) {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("id", e.id());
+      row.put("label", e.label());
+      row.put("includeHeader", e.includeHeader());
+      row.put("columns", List.of());
+      row.put("fidelity", e.fidelity());
+      row.put("sourceUrl", e.sourceUrl());
+      profiles.add(row);
+    }
+    return Map.of("profiles", profiles, "customId", "custom");
   }
 
   static Map<String, Object> toMap(OrgPeriodSettings s) {

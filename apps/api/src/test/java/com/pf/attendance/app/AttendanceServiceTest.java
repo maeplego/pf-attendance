@@ -268,6 +268,27 @@ class AttendanceServiceTest {
     assertThat(new String(pdf, 0, 4)).isEqualTo("%PDF");
   }
 
+  @Test
+  void moneyForwardAndFreeeVendorProfiles() {
+    service.punch(aoki.id(), PunchType.CLOCK_IN);
+    clock.setInstant(Instant.parse("2026-08-19T08:00:00Z"));
+    service.punch(aoki.id(), PunchType.CLOCK_OUT);
+
+    String mf =
+        service.monthCsv(sato, YearMonth.of(2026, 8), "mf-attendance-punch-v1", null, List.of());
+    assertThat(mf.split("\n", 2)[0])
+        .isEqualTo("従業員番号,苗字,名前,打刻所属日,打刻日,打刻時刻,打刻種別");
+    assertThat(mf).contains("aoki.haru,青木,陽,");
+    assertThat(mf).contains("出勤");
+    assertThat(mf).contains("退勤");
+
+    String freee =
+        service.monthCsv(sato, YearMonth.of(2026, 8), "freee-hr-monthly-v1", null, List.of());
+    assertThat(freee).startsWith("従業員番号,氏名,所定労働時間（分）");
+    assertThat(freee).contains("aoki.haru");
+    assertThat(freee).contains("総労働時間（分）");
+  }
+
   private static final class MutableClock extends Clock {
     private Instant instant;
 

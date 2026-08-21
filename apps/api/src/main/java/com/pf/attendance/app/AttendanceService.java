@@ -5,6 +5,7 @@ import com.pf.attendance.app.export.CsvExportProfile;
 import com.pf.attendance.app.export.CsvExportProfiles;
 import com.pf.attendance.app.export.CsvExporter;
 import com.pf.attendance.app.export.PdfTimesheetRenderer;
+import com.pf.attendance.app.export.VendorCsvFormats;
 import com.pf.attendance.app.handoff.HandoffCsv;
 import com.pf.attendance.app.handoff.HandoffDayLine;
 import com.pf.attendance.app.handoff.HandoffReceipt;
@@ -241,6 +242,23 @@ public class AttendanceService {
     OrgPeriodSettings settings = orgSettings.getOrDefault(actor.orgId());
     String profile =
         profileId == null || profileId.isBlank() ? settings.csvProfileId() : profileId.trim();
+    List<Employee> orgEmployees = employees.findAllByOrgId(actor.orgId());
+
+    if (VendorCsvFormats.MF_ATTENDANCE_PUNCH_V1.equals(profile)) {
+      return VendorCsvFormats.moneyForwardPunchCsv(
+          orgEmployees,
+          month,
+          settings.periodAnchorDay(),
+          punches::findByEmployeeAndWorkDate);
+    }
+    if (VendorCsvFormats.FREEE_HR_MONTHLY_V1.equals(profile)) {
+      List<MonthSummary> summaries = new ArrayList<>();
+      for (Employee employee : orgEmployees) {
+        summaries.add(monthSummary(employee.id(), month));
+      }
+      return VendorCsvFormats.freeeHrMonthlyCsv(orgEmployees, month, summaries);
+    }
+
     boolean header = includeHeader == null ? settings.csvIncludeHeader() : includeHeader;
     List<CsvColumn> cols =
         columnsOverride == null || columnsOverride.isEmpty()
@@ -248,7 +266,7 @@ public class AttendanceService {
             : CsvColumn.parseList(columnsOverride);
     CsvExportProfile resolved = CsvExportProfiles.resolve(profile, header, cols);
     List<CsvExporter.EmployeeDayRow> rows = new ArrayList<>();
-    for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
+    for (Employee employee : orgEmployees) {
       rows.addAll(CsvExporter.flatten(employee, monthSummary(employee.id(), month).days()));
     }
     return CsvExporter.render(resolved, rows);

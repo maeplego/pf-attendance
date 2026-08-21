@@ -97,12 +97,14 @@ public class WorkflowController {
         columns == null || columns.isBlank()
             ? List.of()
             : List.of(columns.split(","));
+    String resolvedProfile =
+        profile == null || profile.isBlank() ? "minutes-v1" : profile.trim();
     String csv =
         attendance.monthCsv(employee, YearMonth.parse(month), profile, header, cols);
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"attendance-" + month + ".csv\"")
-        // P16 payroll ingest contract: minutes only, no yen/tax columns.
-        .header("X-Attendance-Export-Contract", "minutes-v1")
+        // Contract id for consumers (P16 expects minutes-v1). Vendor profiles use their own ids.
+        .header("X-Attendance-Export-Contract", resolvedProfile)
         .contentType(MediaType.parseMediaType("text/csv"))
         .body(csv);
   }

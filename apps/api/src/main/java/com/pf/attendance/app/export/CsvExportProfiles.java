@@ -27,7 +27,7 @@ public final class CsvExportProfiles {
   public static final CsvExportProfile ERP_GENERIC_JA =
       new CsvExportProfile(
           CsvExportProfile.ERP_GENERIC_JA,
-          "Generic ERP-ish (employeeCode,date,minutes)",
+          "Generic ERP-ish example (NOT vendor-certified)",
           true,
           List.of(
               CsvColumn.SUB,

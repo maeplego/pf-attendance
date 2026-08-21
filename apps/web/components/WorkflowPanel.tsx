@@ -230,8 +230,10 @@ export function WorkflowPanel() {
         <label>
           CSV profile
           <select value={csvProfile} onChange={(e) => setCsvProfile(e.target.value)}>
-            <option value="minutes-v1">minutes-v1</option>
-            <option value="erp-generic-ja">erp-generic-ja</option>
+            <option value="minutes-v1">minutes-v1 (P16)</option>
+            <option value="mf-attendance-punch-v1">Money Forward 打刻 (公式)</option>
+            <option value="freee-hr-monthly-v1">freee 月次 (公式列・OTは0)</option>
+            <option value="erp-generic-ja">erp-generic-ja (非公式例)</option>
             <option value="custom">custom</option>
           </select>
         </label>

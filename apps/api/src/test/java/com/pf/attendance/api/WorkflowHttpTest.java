@@ -3,6 +3,7 @@ package com.pf.attendance.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,7 +49,7 @@ class WorkflowHttpTest {
                 post("/v1/requests")
                     .header("X-Dev-User-Sub", "aoki.haru")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"type\":\"leave\",\"workDate\":\"2026-08-20\",\"reason\":\"有給\"}"))
+                    .content("{\"type\":\"leave\",\"workDate\":\"2026-08-20\",\"reason\":\"譛臥ｵｦ\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("pending"))
             .andReturn();
@@ -101,6 +102,7 @@ class WorkflowHttpTest {
 
     mvc.perform(get("/v1/months/2026-08/export.csv").header("X-Dev-User-Sub", "sato.mei"))
         .andExpect(status().isOk())
+        .andExpect(header().string("X-Attendance-Export-Contract", "minutes-v1"))
         .andExpect(content().string(org.hamcrest.Matchers.containsString("aoki.haru")));
 
     mvc.perform(get("/v1/reminders/unpunched").param("date", "2026-08-19").header("X-Dev-User-Sub", "sato.mei"))

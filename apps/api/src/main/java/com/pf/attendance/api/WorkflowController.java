@@ -91,6 +91,8 @@ public class WorkflowController {
     String csv = attendance.monthCsv(employee, YearMonth.parse(month));
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"attendance-" + month + ".csv\"")
+        // P16 payroll ingest contract: minutes only, no yen/tax columns.
+        .header("X-Attendance-Export-Contract", "minutes-v1")
         .contentType(MediaType.parseMediaType("text/csv"))
         .body(csv);
   }

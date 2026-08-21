@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "attendance")
 public class AttendanceProperties {
+  private String env = "development";
   private String store = "memory";
   private boolean devAuth = true;
   private String corsOrigin = "http://localhost:3019";
@@ -11,6 +12,14 @@ public class AttendanceProperties {
   private String oidcIssuer = "";
   private String oidcInternalBase = "";
   private String oidcAudience = "";
+
+  public String getEnv() {
+    return env;
+  }
+
+  public void setEnv(String env) {
+    this.env = env;
+  }
 
   public String getStore() {
     return store;

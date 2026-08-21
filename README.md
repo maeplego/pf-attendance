@@ -1,4 +1,9 @@
-﻿# pf-attendance
+# pf-attendance
+
+| まず | リンク |
+| --- | --- |
+| 採用の位置づけ | [HIRING.md](https://github.com/maeplego/portfolio-plan/blob/master/portfolio-plan/HIRING.md) |
+| 確認手順 | [REVIEW.md](https://github.com/maeplego/portfolio-plan/blob/master/portfolio-plan/REVIEW.md) |
 
 学習用の勤怠です。架空の「開発部 8 名」の打刻、休憩控除した日次労働時間、月次カレンダーまでです。金額は出しません。**本番の勤怠 SaaS や給与計算、労基法準拠の置き換えではありません。**
 

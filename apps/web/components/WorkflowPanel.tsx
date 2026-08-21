@@ -5,9 +5,12 @@ import {
   closeMonth,
   decideRequest,
   downloadTextFile,
+  exportHandoffCsv,
   exportMonthCsv,
+  ingestHandoffCsv,
   listAllocations,
   listApprovals,
+  listHandoffs,
   listRequests,
   postAllocation,
   postRequest,
@@ -31,6 +34,7 @@ export function WorkflowPanel() {
   const [inbox, setInbox] = useState<WorkRequestRow[]>([]);
   const [allocs, setAllocs] = useState<TimeAllocationRow[]>([]);
   const [missing, setMissing] = useState<{ sub: string; displayName: string }[]>([]);
+  const [handoffs, setHandoffs] = useState<{ id: string; lineCount: number; sourceHint: string }[]>([]);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
@@ -40,16 +44,18 @@ export function WorkflowPanel() {
       listAllocations(sub, allocDate),
       listApprovals(sub).catch(() => ({ requests: [] as WorkRequestRow[] })),
       unpunched(sub, allocDate).catch(() => ({ employees: [] as { sub: string; displayName: string }[] })),
+      listHandoffs(sub, month).catch(() => ({ receipts: [] as { id: string; lineCount: number; sourceHint: string }[] })),
     ])
-      .then(([r, a, inboxBody, miss]) => {
+      .then(([r, a, inboxBody, miss, hand]) => {
         setMine(r.requests);
         setAllocs(a.allocations);
         setInbox(inboxBody.requests);
         setMissing(miss.employees ?? []);
+        setHandoffs(hand.receipts ?? []);
         setErr("");
       })
       .catch((e) => setErr(String(e)));
-  }, [sub, allocDate]);
+  }, [sub, allocDate, month]);
 
   useEffect(() => {
     reload();
@@ -194,7 +200,33 @@ export function WorkflowPanel() {
         >
           CSV ダウンロード
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            exportHandoffCsv(sub, month)
+              .then(async (text) => {
+                downloadTextFile(`handoff-${month}.csv`, text);
+                const receipt = await ingestHandoffCsv(sub, month, text, "worksite-demo");
+                setInfo(
+                  `${month} の客先ハンズオフを書き出し、雇用主側に取り込みました（${receipt.lineCount} 行）。`,
+                );
+                setErr("");
+                reload();
+              })
+              .catch((e) => setErr(String(e)))
+          }
+        >
+          SES ハンズオフ（書出→取込デモ）
+        </button>
       </div>
+      <p className="muted">受け入れ済みハンズオフ（{month}）— 打刻は作りません</p>
+      <ul>
+        {handoffs.map((h) => (
+          <li key={h.id}>
+            {h.sourceHint}: {h.lineCount} 行
+          </li>
+        ))}
+      </ul>
       <p className="muted">未打刻（{allocDate}）</p>
       <ul>
         {missing.map((e) => (

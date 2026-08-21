@@ -3,6 +3,7 @@ package com.pf.attendance.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.pf.attendance.app.handoff.MockTimesheetHandoffAdapter;
 import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
 import com.pf.attendance.domain.PunchConflictException;
@@ -21,23 +22,27 @@ class AttendanceServiceTest {
   private MemoryEmployeeStore employees;
   private MemoryPunchStore punches;
   private MemoryWorkflowStore workflow;
+  private MockTimesheetHandoffAdapter handoff;
   private MutableClock clock;
   private AttendanceService service;
   private Employee aoki;
   private Employee sato;
+  private Employee ise;
 
   @BeforeEach
   void setUp() {
     employees = new MemoryEmployeeStore();
     punches = new MemoryPunchStore();
     workflow = new MemoryWorkflowStore();
+    handoff = new MockTimesheetHandoffAdapter();
     clock = new MutableClock(Instant.parse("2026-08-19T00:00:00Z"));
     for (Employee employee : DemoEmployees.roster()) {
       employees.save(employee);
     }
     aoki = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "aoki.haru").orElseThrow();
     sato = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "sato.mei").orElseThrow();
-    service = new AttendanceService(employees, punches, workflow, clock);
+    ise = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "ise.yuto").orElseThrow();
+    service = new AttendanceService(employees, punches, workflow, handoff, clock);
   }
 
   @Test
@@ -147,6 +152,34 @@ class AttendanceServiceTest {
     assertThat(csv).contains("WS-CLIENT-A");
     assertThat(csv).contains("架空商事 本社開発");
     assertThat(service.unpunched(sato, LocalDate.of(2026, 8, 19))).extracting(Employee::sub).contains("sato.mei");
+  }
+
+  @Test
+  void handoffExportAndIngestForClientSiteOnly() {
+    service.punch(ise.id(), PunchType.CLOCK_IN);
+    clock.setInstant(Instant.parse("2026-08-19T08:00:00Z"));
+    service.punch(ise.id(), PunchType.CLOCK_OUT);
+
+    String packageCsv = service.exportHandoffCsv(sato, YearMonth.of(2026, 8));
+    assertThat(packageCsv).contains("ise.yuto");
+    assertThat(packageCsv).contains("WS-CLIENT-A");
+    assertThat(packageCsv).doesNotContain("aoki.haru");
+
+    var receipt = service.ingestHandoffCsv(sato, YearMonth.of(2026, 8), packageCsv, "worksite-demo");
+    assertThat(receipt.lines()).isNotEmpty();
+    assertThat(receipt.sourceHint()).isEqualTo("worksite-demo");
+    assertThat(service.listHandoffs(sato, YearMonth.of(2026, 8))).hasSize(1);
+
+    assertThatThrownBy(
+            () ->
+                service.ingestHandoffCsv(
+                    sato,
+                    YearMonth.of(2026, 8),
+                    "sub,worksiteCode,worksiteName,workDate,workMinutes,breakMinutes,status\n"
+                        + "aoki.haru,x,y,2026-08-19,60,0,complete\n",
+                    "bad"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("client_site");
   }
 
   private static final class MutableClock extends Clock {

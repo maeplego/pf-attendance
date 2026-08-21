@@ -160,6 +160,30 @@ export async function exportMonthCsv(sub: string, month: string): Promise<string
   return res.text();
 }
 
+export async function exportHandoffCsv(sub: string, month: string): Promise<string> {
+  const res = await fetch(`${API}/v1/months/${month}/handoff.csv`, req(sub));
+  if (!res.ok) throw new Error(await readError(res));
+  return res.text();
+}
+
+export async function ingestHandoffCsv(sub: string, month: string, csv: string, sourceHint = "csv-upload") {
+  const res = await fetch(
+    `${API}/v1/months/${month}/handoffs?sourceHint=${encodeURIComponent(sourceHint)}`,
+    req(sub, { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv }),
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{ id: string; lineCount: number; sourceHint: string }>;
+}
+
+export async function listHandoffs(sub: string, month: string) {
+  const res = await fetch(`${API}/v1/months/${month}/handoffs`, req(sub));
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<{
+    month: string;
+    receipts: { id: string; lineCount: number; sourceHint: string; acceptedAt: string }[];
+  }>;
+}
+
 export async function unpunched(sub: string, date: string) {
   const res = await fetch(`${API}/v1/reminders/unpunched?date=${encodeURIComponent(date)}`, req(sub));
   if (!res.ok) throw new Error(await readError(res));

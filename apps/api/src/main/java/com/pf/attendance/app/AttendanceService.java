@@ -1,5 +1,9 @@
 package com.pf.attendance.app;
 
+import com.pf.attendance.app.handoff.HandoffCsv;
+import com.pf.attendance.app.handoff.HandoffDayLine;
+import com.pf.attendance.app.handoff.HandoffReceipt;
+import com.pf.attendance.app.handoff.TimesheetHandoffPort;
 import com.pf.attendance.domain.DailyHoursCalculator;
 import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
@@ -23,13 +27,19 @@ public class AttendanceService {
   private final EmployeeStore employees;
   private final PunchStore punches;
   private final WorkflowStore workflow;
+  private final TimesheetHandoffPort handoff;
   private final Clock clock;
 
   public AttendanceService(
-      EmployeeStore employees, PunchStore punches, WorkflowStore workflow, Clock clock) {
+      EmployeeStore employees,
+      PunchStore punches,
+      WorkflowStore workflow,
+      TimesheetHandoffPort handoff,
+      Clock clock) {
     this.employees = employees;
     this.punches = punches;
     this.workflow = workflow;
+    this.handoff = handoff;
     this.clock = clock;
   }
 
@@ -224,6 +234,66 @@ public class AttendanceService {
       }
     }
     return List.copyOf(missing);
+  }
+
+  /**
+   * Build worksite→employer handoff CSV from local punches of {@code client_site} employees.
+   * Demo stand-in for "worksite approved timesheet package".
+   */
+  public String exportHandoffCsv(Employee actor, YearMonth month) {
+    requireManager(actor);
+    List<HandoffDayLine> lines = new ArrayList<>();
+    for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
+      if (!Engagement.CLIENT_SITE.equals(employee.engagement())) {
+        continue;
+      }
+      MonthSummary summary = monthSummary(employee.id(), month);
+      for (DailySummary day : summary.days()) {
+        if (day.workMinutes() == 0 && day.breakMinutes() == 0 && day.punches().isEmpty()) {
+          continue;
+        }
+        lines.add(
+            new HandoffDayLine(
+                employee.sub(),
+                employee.worksiteCode(),
+                employee.worksiteName(),
+                day.workDate().toString(),
+                day.workMinutes(),
+                day.breakMinutes(),
+                day.status().name().toLowerCase()));
+      }
+    }
+    return HandoffCsv.format(lines);
+  }
+
+  /** Accept employer-side handoff CSV. Validates subs are client_site in this org. Does not create punches. */
+  public HandoffReceipt ingestHandoffCsv(Employee actor, YearMonth month, String csvBody, String sourceHint) {
+    requireManager(actor);
+    List<HandoffDayLine> parsed = HandoffCsv.parse(csvBody);
+    for (HandoffDayLine line : parsed) {
+      Employee target =
+          employees
+              .findByOrgIdAndSub(actor.orgId(), line.sub())
+              .orElseThrow(() -> new IllegalArgumentException("unknown sub in handoff: " + line.sub()));
+      if (!Engagement.CLIENT_SITE.equals(target.engagement())) {
+        throw new IllegalArgumentException("handoff sub is not client_site: " + line.sub());
+      }
+    }
+    HandoffReceipt receipt =
+        new HandoffReceipt(
+            Ids.ulid(),
+            actor.orgId(),
+            month,
+            sourceHint == null || sourceHint.isBlank() ? "csv-upload" : sourceHint.trim(),
+            Instant.now(clock),
+            actor.sub(),
+            parsed);
+    return handoff.accept(receipt);
+  }
+
+  public List<HandoffReceipt> listHandoffs(Employee actor, YearMonth month) {
+    requireManager(actor);
+    return handoff.list(actor.orgId(), month);
   }
 
   private static void requireManager(Employee actor) {

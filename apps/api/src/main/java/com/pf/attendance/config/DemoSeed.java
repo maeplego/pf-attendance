@@ -19,10 +19,15 @@ public class DemoSeed implements ApplicationRunner {
 
   @Override
   public void run(ApplicationArguments args) {
-    if (!employees.isEmpty()) {
+    seedOrg(DemoEmployees.ORG_A);
+    seedOrg(DemoEmployees.ORG_B);
+  }
+
+  private void seedOrg(String orgId) {
+    if (!employees.isEmptyForOrg(orgId)) {
       return;
     }
-    for (Employee employee : DemoEmployees.roster()) {
+    for (Employee employee : DemoEmployees.roster(orgId)) {
       employees.save(employee);
     }
   }

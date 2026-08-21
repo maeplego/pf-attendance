@@ -1,6 +1,7 @@
 package com.pf.attendance.security;
 
 import com.pf.attendance.app.AttendanceService;
+import com.pf.attendance.app.DemoEmployees;
 import com.pf.attendance.app.Employee;
 import com.pf.attendance.app.UnknownEmployeeException;
 import com.pf.attendance.config.AttendanceProperties;
@@ -16,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class DevAuthFilter extends OncePerRequestFilter {
   public static final String HEADER = "X-Dev-User-Sub";
+  public static final String ORG_HEADER = "X-Dev-User-Org";
 
   private final AttendanceProperties properties;
   private final AttendanceService attendance;
@@ -43,18 +45,28 @@ public class DevAuthFilter extends OncePerRequestFilter {
       return;
     }
     String sub = null;
+    String orgId = trimToNull(request.getHeader(ORG_HEADER));
     if (properties.isDevAuth()) {
       sub = trimToNull(request.getHeader(HEADER));
     }
     if (sub == null) {
-      sub = bearerSub(request);
+      OidcUserinfoClient.UserInfo info = bearerUser(request);
+      if (info != null) {
+        sub = info.sub();
+        if (orgId == null) {
+          orgId = trimToNull(info.orgId());
+        }
+      }
+    }
+    if (orgId == null) {
+      orgId = DemoEmployees.ORG_A;
     }
     if (sub == null) {
       unauthorized(response, properties.isDevAuth() ? "X-Dev-User-Sub is required" : "Bearer token required");
       return;
     }
     try {
-      Employee employee = attendance.requireBySub(sub);
+      Employee employee = attendance.requireByOrgAndSub(orgId, sub);
       request.setAttribute(EmployeePrincipal.ATTR, employee);
       filterChain.doFilter(request, response);
     } catch (UnknownEmployeeException ex) {
@@ -62,7 +74,7 @@ public class DevAuthFilter extends OncePerRequestFilter {
     }
   }
 
-  private String bearerSub(HttpServletRequest request) {
+  private OidcUserinfoClient.UserInfo bearerUser(HttpServletRequest request) {
     String issuer = properties.getOidcIssuer();
     if (issuer == null || issuer.isBlank()) {
       return null;
@@ -76,7 +88,7 @@ public class DevAuthFilter extends OncePerRequestFilter {
     if (base == null || base.isBlank()) {
       base = issuer;
     }
-    return oidc.resolveSub(base, token);
+    return oidc.resolve(base, token);
   }
 
   private static String trimToNull(String value) {

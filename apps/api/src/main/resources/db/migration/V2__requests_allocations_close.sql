@@ -20,6 +20,6 @@ CREATE TABLE time_allocations (
 );
 
 CREATE TABLE closed_months (
-  month CHAR(7) PRIMARY KEY,
+  month VARCHAR(7) PRIMARY KEY,
   closed_by VARCHAR(128) NOT NULL
 );

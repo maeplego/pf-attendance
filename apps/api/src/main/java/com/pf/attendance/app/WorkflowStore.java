@@ -18,7 +18,7 @@ public interface WorkflowStore {
 
   List<TimeAllocation> listAllocations(String employeeId, LocalDate workDate);
 
-  void closeMonth(YearMonth month, String actorSub);
+  void closeMonth(String orgId, YearMonth month, String actorSub);
 
-  boolean isMonthClosed(YearMonth month);
+  boolean isMonthClosed(String orgId, YearMonth month);
 }

@@ -17,8 +17,8 @@ public class JpaEmployeeStore implements EmployeeStore {
   }
 
   @Override
-  public Optional<Employee> findBySub(String sub) {
-    return repo.findBySub(sub).map(this::toDomain);
+  public Optional<Employee> findByOrgIdAndSub(String orgId, String sub) {
+    return repo.findByOrgIdAndSub(orgId, sub).map(this::toDomain);
   }
 
   @Override
@@ -29,20 +29,22 @@ public class JpaEmployeeStore implements EmployeeStore {
   @Override
   public void save(Employee employee) {
     repo.save(
-        new EmployeeEntity(employee.id(), employee.sub(), employee.displayName(), employee.role()));
+        new EmployeeEntity(
+            employee.id(), employee.orgId(), employee.sub(), employee.displayName(), employee.role()));
   }
 
   @Override
-  public List<Employee> findAll() {
-    return repo.findAll().stream().map(this::toDomain).toList();
+  public List<Employee> findAllByOrgId(String orgId) {
+    return repo.findByOrgId(orgId).stream().map(this::toDomain).toList();
   }
 
   @Override
-  public boolean isEmpty() {
-    return repo.count() == 0;
+  public boolean isEmptyForOrg(String orgId) {
+    return repo.countByOrgId(orgId) == 0;
   }
 
   private Employee toDomain(EmployeeEntity entity) {
-    return new Employee(entity.getId(), entity.getSub(), entity.getDisplayName(), entity.getRole());
+    return new Employee(
+        entity.getId(), entity.getOrgId(), entity.getSub(), entity.getDisplayName(), entity.getRole());
   }
 }

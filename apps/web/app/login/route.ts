@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     response_type: "code",
     client_id: clientId(),
     redirect_uri: redirectUri(),
-    scope: "openid profile email offline_access",
+    scope: "openid profile email offline_access org",
     state,
     nonce,
     code_challenge: s256(verifier),

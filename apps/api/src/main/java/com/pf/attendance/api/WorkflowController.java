@@ -97,12 +97,12 @@ public class WorkflowController {
 
   @GetMapping("/v1/reminders/unpunched")
   public Map<String, Object> unpunched(HttpServletRequest request, @RequestParam String date) {
-    EmployeePrincipal.require(request);
+    Employee actor = EmployeePrincipal.require(request);
     return Map.of(
         "date",
         date,
         "employees",
-        attendance.unpunched(LocalDate.parse(date)).stream()
+        attendance.unpunched(actor, LocalDate.parse(date)).stream()
             .map(e -> Map.of("sub", e.sub(), "displayName", e.displayName(), "role", e.role()))
             .toList());
   }

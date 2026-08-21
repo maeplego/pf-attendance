@@ -51,11 +51,39 @@ function req(sub: string, init: RequestInit = {}): RequestInit {
 
 async function readError(res: Response): Promise<string> {
   try {
-    const body = (await res.json()) as { error?: { message?: string } };
-    return body.error?.message ?? res.statusText;
+    const body = (await res.json()) as { error?: { message?: string; code?: string } };
+    const msg = body.error?.message ?? res.statusText;
+    return formatApiError(msg, body.error?.code, res.status);
   } catch {
-    return res.statusText;
+    return formatApiError(res.statusText, undefined, res.status);
   }
+}
+
+function formatApiError(message: string, code?: string, status?: number): string {
+  const m = message.toLowerCase();
+  if (m.includes("allocations exceed work minutes")) {
+    return "工数按分はその日の労働分以内です。先に「打刻」で出勤〜退勤してから、同じ日付で登録してください。";
+  }
+  if (m.includes("manager role required")) {
+    return "上長（佐藤 芽衣）を選んでから実行してください。";
+  }
+  if (m.includes("month already closed") || code === "period_closed") {
+    return "この月はすでに締め済みです。";
+  }
+  if (status === 500 && message === "Internal Server Error") {
+    return "サーバーエラー（しばらくして再試行）";
+  }
+  return message;
+}
+
+export function downloadTextFile(filename: string, text: string, mime = "text/csv;charset=utf-8") {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function getMe(sub: string): Promise<Me> {

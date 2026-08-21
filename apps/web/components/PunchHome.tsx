@@ -2,17 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getDailySummary, getMe, postPunch, type DailySummary, type Me } from "@/lib/api";
-
-const PEOPLE = [
-  { sub: "aoki.haru", label: "青木 陽（一般）" },
-  { sub: "sato.mei", label: "佐藤 芽衣（上長）" },
-  { sub: "kondo.minato", label: "近藤 湊" },
-  { sub: "fujii.an", label: "藤井 杏" },
-  { sub: "murakami.hayate", label: "村上 颯" },
-  { sub: "okada.ritsu", label: "岡田 律" },
-  { sub: "nakamura.nagi", label: "中村 凪" },
-  { sub: "takahashi.saku", label: "高橋 朔" },
-];
+import { DEMO_PEOPLE } from "@/lib/people";
 
 export function PunchHome() {
   const [sub, setSub] = useState("aoki.haru");
@@ -42,11 +32,14 @@ export function PunchHome() {
 
   return (
     <section>
+      <p className="muted">
+        開発モード: セレクタはデモ用の従業員切替です。他人の打刻は API 上その sub として記録されます（本番は IdP で本人に固定）。
+      </p>
       <label>
-        従業員（架空）
+        従業員（架空・デモ切替）
         <div>
           <select value={sub} onChange={(e) => setSub(e.target.value)}>
-            {PEOPLE.map((p) => (
+            {DEMO_PEOPLE.map((p) => (
               <option key={p.sub} value={p.sub}>
                 {p.label}
               </option>

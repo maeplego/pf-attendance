@@ -28,8 +28,13 @@ services:
       ATTENDANCE_DATASOURCE_URL: ${ATTENDANCE_DATASOURCE_URL:-jdbc:postgresql://attendance-db:5432/attendance}
       ATTENDANCE_DB_USER: attendance
       ATTENDANCE_DB_PASSWORD: attendance
+      ATTENDANCE_OIDC_ISSUER: ${ATTENDANCE_OIDC_ISSUER:-}
+      ATTENDANCE_OIDC_INTERNAL_BASE: ${ATTENDANCE_OIDC_INTERNAL_BASE:-}
+      ATTENDANCE_OIDC_AUDIENCE: ${ATTENDANCE_OIDC_AUDIENCE:-}
     ports:
       - "8019:8019"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       attendance-db:
         condition: service_healthy
@@ -46,9 +51,18 @@ services:
       args:
         NEXT_PUBLIC_ATTENDANCE_API_URL: ${NEXT_PUBLIC_ATTENDANCE_API_URL:-http://localhost:8019}
     environment:
+      # Browser uses localhost; server-side proxy uses the compose service name.
+      ATTENDANCE_API_URL: ${ATTENDANCE_API_URL:-http://attendance-api:8019}
       NEXT_PUBLIC_ATTENDANCE_API_URL: ${NEXT_PUBLIC_ATTENDANCE_API_URL:-http://localhost:8019}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_INTERNAL_BASE: ${OIDC_INTERNAL_BASE:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_POST_LOGOUT_REDIRECT_URI: ${OIDC_POST_LOGOUT_REDIRECT_URI:-}
     ports:
       - "3019:3019"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       attendance-api:
         condition: service_healthy

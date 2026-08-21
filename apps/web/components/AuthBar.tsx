@@ -2,28 +2,59 @@
 
 import { useEffect, useState } from "react";
 
+import { OrgSwitcher } from "@/components/OrgSwitcher";
+import { switchActiveOrg } from "@/lib/org-actions";
+
+type OrgOption = { orgId: string; orgName: string; role: string };
+
 type Session = {
   oidc: boolean;
   loggedIn: boolean;
   sub: string | null;
   displayName: string | null;
   devMode: boolean;
+  orgId?: string;
+  organizations?: OrgOption[];
 };
 
 export function AuthBar() {
   const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => {
+  const reload = () => {
     fetch("/api/session", { credentials: "same-origin", cache: "no-store" })
       .then((res) => res.json())
       .then((body) => setSession(body as Session))
       .catch(() => setSession(null));
+  };
+
+  useEffect(() => {
+    reload();
   }, []);
 
-  if (!session?.oidc) {
+  const onSwitch = async (orgId: string) => {
+    await switchActiveOrg(orgId);
+    reload();
+    window.location.reload();
+  };
+
+  if (!session) {
+    return <span className="auth-bar muted">…</span>;
+  }
+
+  const switcher =
+    session.organizations && session.organizations.length > 0 ? (
+      <OrgSwitcher
+        currentOrgId={session.orgId}
+        organizations={session.organizations}
+        onSwitch={onSwitch}
+      />
+    ) : null;
+
+  if (!session.oidc) {
     return (
-      <span className="auth-bar muted">
-        dev-auth（従業員セレクタ）
+      <span className="auth-bar" style={{ display: "inline-flex", gap: "0.75rem", alignItems: "center" }}>
+        {switcher}
+        <span className="muted">dev-auth（デモ用なりすまし。IdP 未連携）</span>
       </span>
     );
   }
@@ -35,7 +66,8 @@ export function AuthBar() {
     );
   }
   return (
-    <span className="auth-bar">
+    <span className="auth-bar" style={{ display: "inline-flex", gap: "0.75rem", alignItems: "center" }}>
+      {switcher}
       <span className="muted">{session.displayName ?? session.sub}</span>
       {" · "}
       <a href="/logout">ログアウト</a>

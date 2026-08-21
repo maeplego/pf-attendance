@@ -2,13 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getMonthSummary, type MonthDay } from "@/lib/api";
+import { DEMO_PEOPLE } from "@/lib/people";
 
-const PEOPLE = [
-  { sub: "aoki.haru", label: "青木 陽（一般）" },
-  { sub: "sato.mei", label: "佐藤 芽衣（上長）" },
-  { sub: "kondo.minato", label: "近藤 湊" },
-  { sub: "fujii.an", label: "藤井 杏" },
-];
+const PEOPLE = DEMO_PEOPLE;
 
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
 

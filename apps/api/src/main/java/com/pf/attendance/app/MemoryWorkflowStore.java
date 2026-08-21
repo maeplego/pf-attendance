@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MemoryWorkflowStore implements WorkflowStore {
   private final ConcurrentHashMap<String, WorkRequest> requests = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, TimeAllocation> allocations = new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<YearMonth, String> closed = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, String> closed = new ConcurrentHashMap<>();
 
   @Override
   public void saveRequest(WorkRequest request) {
@@ -61,12 +61,16 @@ public final class MemoryWorkflowStore implements WorkflowStore {
   }
 
   @Override
-  public void closeMonth(YearMonth month, String actorSub) {
-    closed.put(month, actorSub);
+  public void closeMonth(String orgId, YearMonth month, String actorSub) {
+    closed.put(closedKey(orgId, month), actorSub);
   }
 
   @Override
-  public boolean isMonthClosed(YearMonth month) {
-    return closed.containsKey(month);
+  public boolean isMonthClosed(String orgId, YearMonth month) {
+    return closed.containsKey(closedKey(orgId, month));
+  }
+
+  private static String closedKey(String orgId, YearMonth month) {
+    return orgId + "|" + month;
   }
 }

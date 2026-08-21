@@ -78,13 +78,17 @@ public class JpaWorkflowStore implements WorkflowStore {
   }
 
   @Override
-  public void closeMonth(YearMonth month, String actorSub) {
-    closed.save(new ClosedMonthEntity(month.toString(), actorSub));
+  public void closeMonth(String orgId, YearMonth month, String actorSub) {
+    String key = month.toString();
+    if (closed.existsByOrgIdAndMonth(orgId, key)) {
+      throw new com.pf.attendance.domain.PeriodClosedException("month already closed");
+    }
+    closed.save(new ClosedMonthEntity(orgId, key, actorSub));
   }
 
   @Override
-  public boolean isMonthClosed(YearMonth month) {
-    return closed.existsById(month.toString());
+  public boolean isMonthClosed(String orgId, YearMonth month) {
+    return closed.existsByOrgIdAndMonth(orgId, month.toString());
   }
 
   private WorkRequest toRequest(WorkRequestEntity e) {

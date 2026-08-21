@@ -12,10 +12,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OidcUserinfoClient {
+  public record UserInfo(String sub, String orgId) {}
+
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
   private final ObjectMapper json = new ObjectMapper();
 
-  public String resolveSub(String internalBase, String bearerToken) {
+  public UserInfo resolve(String internalBase, String bearerToken) {
     if (internalBase == null || internalBase.isBlank() || bearerToken == null || bearerToken.isBlank()) {
       return null;
     }
@@ -35,7 +37,12 @@ public class OidcUserinfoClient {
       if (sub == null || sub.asText().isBlank()) {
         return null;
       }
-      return sub.asText().trim();
+      String orgId = null;
+      JsonNode org = node.get("org_id");
+      if (org != null && !org.asText().isBlank()) {
+        orgId = org.asText().trim();
+      }
+      return new UserInfo(sub.asText().trim(), orgId);
     } catch (IOException ex) {
       return null;
     } catch (InterruptedException ex) {

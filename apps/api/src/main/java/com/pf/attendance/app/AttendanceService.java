@@ -4,7 +4,6 @@ import com.pf.attendance.domain.DailyHoursCalculator;
 import com.pf.attendance.domain.DailySummary;
 import com.pf.attendance.domain.MonthSummary;
 import com.pf.attendance.domain.PeriodClosedException;
-import com.pf.attendance.domain.PunchConflictException;
 import com.pf.attendance.domain.PunchEvent;
 import com.pf.attendance.domain.PunchRules;
 import com.pf.attendance.domain.PunchType;
@@ -15,6 +14,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.StringJoiner;
 import org.springframework.stereotype.Service;
 
@@ -33,9 +33,9 @@ public class AttendanceService {
     this.clock = clock;
   }
 
-  public Employee requireBySub(String sub) {
+  public Employee requireByOrgAndSub(String orgId, String sub) {
     return employees
-        .findBySub(sub)
+        .findByOrgIdAndSub(orgId, sub)
         .orElseThrow(() -> new UnknownEmployeeException(sub));
   }
 
@@ -46,7 +46,7 @@ public class AttendanceService {
             .orElseThrow(() -> new UnknownEmployeeException(employeeId));
     Instant now = Instant.now(clock);
     LocalDate workDate = WorkDates.of(now);
-    if (workflow.isMonthClosed(YearMonth.from(workDate))) {
+    if (workflow.isMonthClosed(employee.orgId(), YearMonth.from(workDate))) {
       throw new PeriodClosedException("month is closed");
     }
     List<PunchEvent> existing = punches.findByEmployeeAndWorkDate(employee.id(), workDate);
@@ -81,16 +81,15 @@ public class AttendanceService {
   }
 
   public WorkRequest submitRequest(String employeeId, String type, LocalDate workDate, String reason) {
-    if (employees.findById(employeeId).isEmpty()) {
-      throw new UnknownEmployeeException(employeeId);
-    }
+    Employee employee =
+        employees.findById(employeeId).orElseThrow(() -> new UnknownEmployeeException(employeeId));
     if (!WorkRequest.LEAVE.equals(type) && !WorkRequest.PUNCH_CORRECTION.equals(type)) {
       throw new IllegalArgumentException("type must be leave or punch_correction");
     }
     if (reason == null || reason.isBlank()) {
       throw new IllegalArgumentException("reason is required");
     }
-    if (workflow.isMonthClosed(YearMonth.from(workDate))) {
+    if (workflow.isMonthClosed(employee.orgId(), YearMonth.from(workDate))) {
       throw new PeriodClosedException("month is closed");
     }
     WorkRequest row =
@@ -114,13 +113,27 @@ public class AttendanceService {
 
   public List<WorkRequest> inbox(Employee actor) {
     requireManager(actor);
-    return workflow.listPending();
+    List<WorkRequest> out = new ArrayList<>();
+    for (WorkRequest row : workflow.listPending()) {
+      Optional<Employee> subject = employees.findById(row.employeeId());
+      if (subject.isPresent() && actor.orgId().equals(subject.get().orgId())) {
+        out.add(row);
+      }
+    }
+    return List.copyOf(out);
   }
 
   public WorkRequest decide(Employee actor, String requestId, boolean approve) {
     requireManager(actor);
     WorkRequest existing =
         workflow.findRequest(requestId).orElseThrow(() -> new IllegalArgumentException("request not found"));
+    Employee subject =
+        employees
+            .findById(existing.employeeId())
+            .orElseThrow(() -> new IllegalArgumentException("request not found"));
+    if (!actor.orgId().equals(subject.orgId())) {
+      throw new ForbiddenException("cross-org request");
+    }
     if (!WorkRequest.PENDING.equals(existing.status())) {
       throw new IllegalArgumentException("request already decided");
     }
@@ -140,16 +153,15 @@ public class AttendanceService {
   }
 
   public TimeAllocation allocate(String employeeId, LocalDate workDate, String project, int minutes) {
-    if (employees.findById(employeeId).isEmpty()) {
-      throw new UnknownEmployeeException(employeeId);
-    }
+    Employee employee =
+        employees.findById(employeeId).orElseThrow(() -> new UnknownEmployeeException(employeeId));
     if (project == null || project.isBlank()) {
       throw new IllegalArgumentException("project is required");
     }
     if (minutes <= 0) {
       throw new IllegalArgumentException("minutes must be positive");
     }
-    if (workflow.isMonthClosed(YearMonth.from(workDate))) {
+    if (workflow.isMonthClosed(employee.orgId(), YearMonth.from(workDate))) {
       throw new PeriodClosedException("month is closed");
     }
     int used = workflow.listAllocations(employeeId, workDate).stream().mapToInt(TimeAllocation::minutes).sum();
@@ -168,18 +180,21 @@ public class AttendanceService {
 
   public void closeMonth(Employee actor, YearMonth month) {
     requireManager(actor);
-    workflow.closeMonth(month, actor.sub());
+    if (workflow.isMonthClosed(actor.orgId(), month)) {
+      throw new PeriodClosedException("month already closed");
+    }
+    workflow.closeMonth(actor.orgId(), month, actor.sub());
   }
 
-  public boolean isMonthClosed(YearMonth month) {
-    return workflow.isMonthClosed(month);
+  public boolean isMonthClosed(Employee actor, YearMonth month) {
+    return workflow.isMonthClosed(actor.orgId(), month);
   }
 
   public String monthCsv(Employee actor, YearMonth month) {
     requireManager(actor);
     StringJoiner lines = new StringJoiner("\n");
     lines.add("sub,displayName,workDate,workMinutes,breakMinutes,status");
-    for (Employee employee : employees.findAll()) {
+    for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
       MonthSummary summary = monthSummary(employee.id(), month);
       for (DailySummary day : summary.days()) {
         lines.add(
@@ -196,9 +211,9 @@ public class AttendanceService {
     return lines.toString() + "\n";
   }
 
-  public List<Employee> unpunched(LocalDate workDate) {
+  public List<Employee> unpunched(Employee actor, LocalDate workDate) {
     List<Employee> missing = new ArrayList<>();
-    for (Employee employee : employees.findAll()) {
+    for (Employee employee : employees.findAllByOrgId(actor.orgId())) {
       if (punches.findByEmployeeAndWorkDate(employee.id(), workDate).isEmpty()) {
         missing.add(employee);
       }

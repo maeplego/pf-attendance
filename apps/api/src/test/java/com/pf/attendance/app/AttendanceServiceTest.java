@@ -35,8 +35,8 @@ class AttendanceServiceTest {
     for (Employee employee : DemoEmployees.roster()) {
       employees.save(employee);
     }
-    aoki = employees.findBySub("aoki.haru").orElseThrow();
-    sato = employees.findBySub("sato.mei").orElseThrow();
+    aoki = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "aoki.haru").orElseThrow();
+    sato = employees.findByOrgIdAndSub(DemoEmployees.ORG_A, "sato.mei").orElseThrow();
     service = new AttendanceService(employees, punches, workflow, clock);
   }
 
@@ -138,7 +138,7 @@ class AttendanceServiceTest {
         .isInstanceOf(com.pf.attendance.domain.PeriodClosedException.class);
     String csv = service.monthCsv(sato, YearMonth.of(2026, 8));
     assertThat(csv).contains("aoki.haru");
-    assertThat(service.unpunched(LocalDate.of(2026, 8, 19))).extracting(Employee::sub).contains("sato.mei");
+    assertThat(service.unpunched(sato, LocalDate.of(2026, 8, 19))).extracting(Employee::sub).contains("sato.mei");
   }
 
   private static final class MutableClock extends Clock {

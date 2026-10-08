@@ -1,12 +1,25 @@
-# Always-on unit + vuln CI.
+# Unit + vuln CI. Runs on push to master when a listed path changes, or by hand
+# (workflow_dispatch). Work branches rely on local tests; run this by hand once
+# before merging.
 # Compose up, Playwright browsers, and Docker Desktop Kubernetes are not in this
 # workflow: hosted runners have no Desktop cluster, and image builds are too slow
-# for every push. See portfolio-plan/ci.md in the meta repo.
+# for every run. See portfolio-plan/18-ci.md in the meta repo.
 name: ci
 
 on:
   push:
-  pull_request:
+    branches: [master]
+    paths:
+      - "apps/**"
+      - "deploy/**"
+      - "ledger/**"
+      - ".trivyignore"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
